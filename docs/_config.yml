@@ -1,0 +1,10 @@
+# Jekyll configuration for GitHub Pages
+# This tells GitHub Pages not to process the site with Jekyll
+# since we're serving static HTML/JS/CSS files directly
+
+# Exclude files from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
