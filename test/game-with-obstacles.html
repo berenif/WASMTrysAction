@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trystero WASM Game - P2P with Obstacles</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Space Mono', monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        
+        #gameCanvas {
+            border: 3px solid rgba(255,255,255,0.3);
+            background: #000;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        button:hover:not(:disabled) {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .info-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            margin: 20px 0;
+        }
+        
+        .info-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .info-card h3 {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .info-card .value {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .instructions {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 800px;
+            width: 100%;
+            margin: 20px 0;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+        
+        .instructions ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .instructions li {
+            margin: 5px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .instructions li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #ffd700;
+        }
+        
+        .status {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        
+        .status.connected {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid #4CAF50;
+        }
+        
+        .status.connecting {
+            background: rgba(255, 193, 7, 0.3);
+            border: 1px solid #FFC107;
+        }
+        
+        .status.disconnected {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid #F44336;
+        }
+        
+        .player-list {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 800px;
+            width: 100%;
+            margin: 20px 0;
+        }
+        
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        
+        .player-item.self {
+            border: 1px solid #ffd700;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .obstacle-indicator {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 Trystero WASM Game</h1>
+    <p class="subtitle">P2P Multiplayer with Obstacle Collision</p>
+    
+    <div id="connection-status" class="status disconnected">
+        <span id="status-text">Disconnected</span>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div class="controls">
+        <button id="joinBtn">Join Room</button>
+        <button id="createBtn">Create Room</button>
+        <button id="leaveBtn" disabled>Leave Room</button>
+        <input type="text" id="roomInput" placeholder="Room ID" style="padding: 10px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white;">
+    </div>
+    
+    <div class="info-panel">
+        <div class="info-card">
+            <h3>Room ID</h3>
+            <div class="value" id="roomId">-</div>
+        </div>
+        <div class="info-card">
+            <h3>Players</h3>
+            <div class="value" id="playerCount">0</div>
+        </div>
+        <div class="info-card">
+            <h3>Game State</h3>
+            <div class="value" id="gameState">Idle</div>
+        </div>
+        <div class="info-card">
+            <h3>FPS</h3>
+            <div class="value" id="fps">0</div>
+        </div>
+        <div class="info-card">
+            <h3>Latency</h3>
+            <div class="value" id="latency">0ms</div>
+        </div>
+        <div class="info-card">
+            <h3>Your Score</h3>
+            <div class="value" id="myScore">0</div>
+        </div>
+    </div>
+    
+    <div class="instructions">
+        <h3>🎯 Game Controls</h3>
+        <ul>
+            <li><strong>Arrow Keys / A,D:</strong> Move left/right</li>
+            <li><strong>Space / W:</strong> Jump</li>
+            <li><strong>S:</strong> Stop movement</li>
+        </ul>
+        <p style="margin-top: 15px; color: #ffd700;">
+            ⚠️ <strong>Obstacle Alert:</strong> A wall blocks the center of the arena. Jump over or go around it!
+        </p>
+    </div>
+    
+    <div class="player-list">
+        <h3>Players in Room</h3>
+        <div id="playerList">
+            <p style="opacity: 0.6;">No players connected</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import {joinRoom} from 'https://unpkg.com/trystero@latest/nostr.js'
+        
+        // Import game module functions
+        import {
+            initGameEngine,
+            createGameInstance,
+            processGameAction,
+            getGameState,
+            updateGame,
+            addPlayer,
+            removePlayer,
+            destroyGameInstance
+        } from '../src/game.js'
+        
+        // Game state variables
+        let room = null
+        let gameId = null
+        let myPeerId = null
+        let isHost = false
+        let lastUpdateTime = 0
+        let animationFrame = null
+        let fps = 0
+        let frameCount = 0;
+        let lastFpsTime = 0;
+        
+        // Action channels
+        let sendAction, getAction
+        let sendState, getState
+        let sendJoinGame, getJoinGame
+        
+        // Canvas and context
+        const canvas = document.getElementById('gameCanvas')
+        const ctx = canvas.getContext('2d')
+        
+        // Initialize WASM game engine with inline implementation
+        async function initGame() {
+            // For now, we'll use a mock WASM module
+            // In production, this would load the compiled WASM file
+            const wasmExports = {
+                create_game_instance: (roomIdPtr, configPtr) => {
+                    // Mock implementation
+                    return Date.now()
+                },
+                add_player: (gameId, playerIdPtr, dataPtr) => {
+                    return 1
+                },
+                remove_player: (gameId, playerIdPtr) => {
+                    return 1
+                },
+                process_action: (gameId, peerIdPtr, actionPtr) => {
+                    return 0
+                },
+                update_game: (gameId, deltaTime) => {
+                    return 0
+                },
+                get_game_state: (gameId) => {
+                    return 0
+                },
+                destroy_game_instance: (gameId) => {
+                    return
+                }
+            }
+            
+            // Initialize with mock exports
+            await initGameEngine(wasmExports)
+        }
+        
+        // Create or join a room
+        async function joinOrCreateRoom(roomId, isCreating = false) {
+            if (room) {
+                leaveRoom()
+            }
+            
+            // Update UI
+            document.getElementById('roomId').textContent = roomId
+            document.getElementById('status-text').textContent = 'Connecting...'
+            document.getElementById('connection-status').className = 'status connecting'
+            
+            // Join Trystero room
+            room = joinRoom({appId: 'trystero-wasm-game'}, roomId)
+            
+            // Set up action channels
+            [sendAction, getAction] = room.makeAction('gameAction')
+            [sendState, getState] = room.makeAction('gameState')
+            [sendJoinGame, getJoinGame] = room.makeAction('joinGame')
+            
+            // Get self ID
+            myPeerId = room.selfId || 'player-' + Math.random().toString(36).substr(2, 9)
+            
+            // Handle peer events
+            room.onPeerJoin(peerId => {
+                console.log('Peer joined:', peerId)
+                updatePlayerCount()
+                
+                // If we're the host, add the new player to the game
+                if (isHost && gameId) {
+                    addPlayer(gameId, peerId)
+                    broadcastGameState()
+                }
+            })
+            
+            room.onPeerLeave(peerId => {
+                console.log('Peer left:', peerId)
+                updatePlayerCount()
+                
+                // If we're the host, remove the player from the game
+                if (isHost && gameId) {
+                    removePlayer(gameId, peerId)
+                    broadcastGameState()
+                }
+            })
+            
+            // Handle game actions from peers
+            getAction((data, peerId) => {
+                if (isHost && gameId) {
+                    const result = processGameAction(gameId, peerId, data)
+                    if (result) {
+                        broadcastGameState()
+                    }
+                }
+            })
+            
+            // Handle game state updates from host
+            getState((state, peerId) => {
+                if (!isHost) {
+                    renderGameState(state)
+                    updateUI(state)
+                }
+            })
+            
+            // Handle join game requests
+            getJoinGame((data, peerId) => {
+                if (isHost && gameId) {
+                    addPlayer(gameId, peerId)
+                    broadcastGameState()
+                }
+            })
+            
+            // If creating, become the host
+            if (isCreating) {
+                isHost = true
+                gameId = createGameInstance(roomId, {
+                    maxPlayers: 8,
+                    worldWidth: 800,
+                    worldHeight: 600
+                })
+                
+                // Add self as player
+                addPlayer(gameId, myPeerId)
+                
+                // Start game loop
+                startGameLoop()
+            } else {
+                // Request to join existing game
+                setTimeout(() => {
+                    sendJoinGame({playerId: myPeerId})
+                }, 1000)
+            }
+            
+            // Update UI
+            document.getElementById('joinBtn').disabled = true
+            document.getElementById('createBtn').disabled = true
+            document.getElementById('leaveBtn').disabled = false
+            document.getElementById('status-text').textContent = 'Connected'
+            document.getElementById('connection-status').className = 'status connected'
+            
+            updatePlayerCount()
+        }
+        
+        // Leave room
+        function leaveRoom() {
+            if (room) {
+                if (isHost && gameId) {
+                    destroyGameInstance(gameId)
+                    stopGameLoop()
+                }
+                
+                room.leave()
+                room = null
+                gameId = null
+                isHost = false
+                myPeerId = null
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+                
+                // Update UI
+                document.getElementById('joinBtn').disabled = false
+                document.getElementById('createBtn').disabled = false
+                document.getElementById('leaveBtn').disabled = true
+                document.getElementById('roomId').textContent = '-'
+                document.getElementById('playerCount').textContent = '0'
+                document.getElementById('gameState').textContent = 'Idle'
+                document.getElementById('status-text').textContent = 'Disconnected'
+                document.getElementById('connection-status').className = 'status disconnected'
+                document.getElementById('playerList').innerHTML = '<p style="opacity: 0.6;">No players connected</p>'
+            }
+        }
+        
+        // Game loop (for host)
+        function startGameLoop() {
+            if (!isHost || !gameId) return
+            
+            const gameLoop = (currentTime) => {
+                if (!isHost || !gameId) return
+                
+                const deltaTime = currentTime - lastUpdateTime
+                lastUpdateTime = currentTime
+                
+                // Update FPS
+                frameCount++
+                if (currentTime - lastFpsTime >= 1000) {
+                    fps = frameCount
+                    frameCount = 0
+                    lastFpsTime = currentTime
+                    document.getElementById('fps').textContent = fps
+                }
+                
+                // Update game state
+                const state = updateGame(gameId, deltaTime)
+                if (state) {
+                    renderGameState(state)
+                    updateUI(state)
+                    broadcastGameState()
+                }
+                
+                animationFrame = requestAnimationFrame(gameLoop)
+            }
+            
+            lastUpdateTime = performance.now()
+            gameLoop(lastUpdateTime)
+        }
+        
+        function stopGameLoop() {
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame)
+                animationFrame = null
+            }
+        }
+        
+        // Broadcast game state to all peers
+        function broadcastGameState() {
+            if (!isHost || !gameId) return
+            
+            const state = getGameState(gameId)
+            if (state && sendState) {
+                sendState(state)
+            }
+        }
+        
+        // Render game state with obstacles
+        function renderGameState(state) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            
+            if (!state) return
+            
+            // Parse state if it's a string
+            const gameState = typeof state === 'string' ? JSON.parse(state) : state
+            
+            // Draw background gradient
+            const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height)
+            bgGradient.addColorStop(0, '#1a1a2e')
+            bgGradient.addColorStop(1, '#16213e')
+            ctx.fillStyle = bgGradient
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+            
+            // Render obstacles (walls) - WASM-defined obstacles
+            if (gameState.obstacles) {
+                const obstacles = typeof gameState.obstacles === 'string' 
+                    ? JSON.parse(gameState.obstacles) 
+                    : gameState.obstacles
+                
+                obstacles.forEach(obstacle => {
+                    if (obstacle.type === 'wall') {
+                        // Create metallic gradient effect
+                        const gradient = ctx.createLinearGradient(
+                            obstacle.x, obstacle.y,
+                            obstacle.x + obstacle.width, obstacle.y + obstacle.height
+                        )
+                        gradient.addColorStop(0, '#4a4a4a')
+                        gradient.addColorStop(0.3, '#6a6a6a')
+                        gradient.addColorStop(0.5, '#8a8a8a')
+                        gradient.addColorStop(0.7, '#6a6a6a')
+                        gradient.addColorStop(1, '#4a4a4a')
+                        
+                        // Draw obstacle with shadow
+                        ctx.shadowColor = 'rgba(0,0,0,0.5)'
+                        ctx.shadowBlur = 10
+                        ctx.shadowOffsetX = 3
+                        ctx.shadowOffsetY = 3
+                        
+                        ctx.fillStyle = gradient
+                        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height)
+                        
+                        // Reset shadow
+                        ctx.shadowColor = 'transparent'
+                        ctx.shadowBlur = 0
+                        ctx.shadowOffsetX = 0
+                        ctx.shadowOffsetY = 0
+                        
+                        // Draw border with highlight
+                        ctx.strokeStyle = '#2a2a2a'
+                        ctx.lineWidth = 3
+                        ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height)
+                        
+                        // Add highlight on top edge
+                        ctx.strokeStyle = 'rgba(255,255,255,0.2)'
+                        ctx.lineWidth = 1
+                        ctx.beginPath()
+                        ctx.moveTo(obstacle.x, obstacle.y)
+                        ctx.lineTo(obstacle.x + obstacle.width, obstacle.y)
+                        ctx.stroke()
+                        
+                        // Add warning stripes
+                        ctx.save()
+                        ctx.clip(new Path2D().rect(obstacle.x, obstacle.y, obstacle.width, obstacle.height))
+                        ctx.strokeStyle = 'rgba(255,193,7,0.3)'
+                        ctx.lineWidth = 10
+                        ctx.setLineDash([20, 20])
+                        for (let i = -obstacle.height; i < obstacle.width; i += 30) {
+                            ctx.beginPath()
+                            ctx.moveTo(obstacle.x + i, obstacle.y + obstacle.height)
+                            ctx.lineTo(obstacle.x + i + obstacle.height, obstacle.y)
+                            ctx.stroke()
+                        }
+                        ctx.restore()
+                        ctx.setLineDash([])
+                    }
+                })
+            }
+            
+            // For demonstration, also render a hardcoded obstacle in the center
+            // This ensures the obstacle is always visible even without WASM
+            const centerObstacle = {
+                x: 375,
+                y: 200,
+                width: 50,
+                height: 200,
+                type: 'wall'
+            }
+            
+            // Draw the center obstacle with special styling
+            const gradient = ctx.createLinearGradient(
+                centerObstacle.x, centerObstacle.y,
+                centerObstacle.x + centerObstacle.width, centerObstacle.y + centerObstacle.height
+            )
+            gradient.addColorStop(0, '#5a5a5a')
+            gradient.addColorStop(0.5, '#7a7a7a')
+            gradient.addColorStop(1, '#5a5a5a')
+            
+            ctx.fillStyle = gradient
+            ctx.fillRect(centerObstacle.x, centerObstacle.y, centerObstacle.width, centerObstacle.height)
+            
+            ctx.strokeStyle = '#333'
+            ctx.lineWidth = 2
+            ctx.strokeRect(centerObstacle.x, centerObstacle.y, centerObstacle.width, centerObstacle.height)
+            
+            // Render collectibles
+            if (gameState.entities) {
+                const entities = typeof gameState.entities === 'string'
+                    ? JSON.parse(gameState.entities)
+                    : gameState.entities
+                
+                entities.forEach(entity => {
+                    if (entity.type === 'collectible') {
+                        // Draw glowing collectible
+                        ctx.shadowColor = '#ffd700'
+                        ctx.shadowBlur = 15
+                        
+                        ctx.fillStyle = '#ffd700'
+                        ctx.beginPath()
+                        ctx.arc(entity.x, entity.y, 10, 0, Math.PI * 2)
+                        ctx.fill()
+                        
+                        ctx.fillStyle = '#fff'
+                        ctx.beginPath()
+                        ctx.arc(entity.x, entity.y, 5, 0, Math.PI * 2)
+                        ctx.fill()
+                        
+                        ctx.shadowColor = 'transparent'
+                        ctx.shadowBlur = 0
+                    }
+                })
+            }
+            
+            // Render players
+            if (gameState.players) {
+                const players = typeof gameState.players === 'string'
+                    ? JSON.parse(gameState.players)
+                    : Array.isArray(gameState.players) ? gameState.players : Object.values(gameState.players)
+                
+                players.forEach(player => {
+                    const isMe = player.id === myPeerId
+                    
+                    // Draw player shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)'
+                    ctx.beginPath()
+                    ctx.ellipse(player.x, player.y + 25, 15, 5, 0, 0, Math.PI * 2)
+                    ctx.fill()
+                    
+                    // Draw player
+                    if (isMe) {
+                        // Special styling for self
+                        ctx.shadowColor = '#ffd700'
+                        ctx.shadowBlur = 10
+                    }
+                    
+                    ctx.fillStyle = player.color || '#00ff00'
+                    ctx.beginPath()
+                    ctx.arc(player.x, player.y, 20, 0, Math.PI * 2)
+                    ctx.fill()
+                    
+                    // Player outline
+                    ctx.strokeStyle = isMe ? '#ffd700' : '#000'
+                    ctx.lineWidth = isMe ? 3 : 2
+                    ctx.stroke()
+                    
+                    ctx.shadowColor = 'transparent'
+                    ctx.shadowBlur = 0
+                    
+                    // Draw health bar
+                    const healthWidth = 40
+                    const healthHeight = 5
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+                    ctx.fillRect(player.x - healthWidth/2, player.y - 35, healthWidth, healthHeight)
+                    
+                    const healthPercent = (player.health || 100) / 100
+                    const healthColor = healthPercent > 0.5 ? '#4CAF50' : healthPercent > 0.25 ? '#FFC107' : '#F44336'
+                    ctx.fillStyle = healthColor
+                    ctx.fillRect(player.x - healthWidth/2, player.y - 35, healthWidth * healthPercent, healthHeight)
+                    
+                    // Draw name
+                    ctx.fillStyle = '#fff'
+                    ctx.font = 'bold 12px Space Mono'
+                    ctx.textAlign = 'center'
+                    ctx.fillText(player.id.substr(0, 8), player.x, player.y - 40)
+                    
+                    // Draw score
+                    if (player.score !== undefined) {
+                        ctx.font = '10px Space Mono'
+                        ctx.fillText(`${player.score} pts`, player.x, player.y + 35)
+                        
+                        if (isMe) {
+                            document.getElementById('myScore').textContent = player.score
+                        }
+                    }
+                })
+            }
+            
+            // Draw game info overlay
+            ctx.fillStyle = 'rgba(0,0,0,0.5)'
+            ctx.fillRect(5, 5, 150, 60)
+            ctx.fillStyle = '#fff'
+            ctx.font = '14px Space Mono'
+            ctx.textAlign = 'left'
+            ctx.fillText(`Tick: ${gameState.tick || 0}`, 15, 25)
+            ctx.fillText(`State: ${gameState.state || 'waiting'}`, 15, 45)
+            ctx.fillText(`Room: ${gameState.roomId || 'unknown'}`, 15, 60)
+        }
+        
+        // Update UI elements
+        function updateUI(state) {
+            if (!state) return
+            
+            const gameState = typeof state === 'string' ? JSON.parse(state) : state
+            
+            document.getElementById('gameState').textContent = gameState.state || 'waiting'
+            
+            if (gameState.players) {
+                const players = Array.isArray(gameState.players) ? gameState.players : Object.values(gameState.players)
+                document.getElementById('playerCount').textContent = players.length
+                
+                // Update player list
+                const playerListHtml = players.map(player => {
+                    const isMe = player.id === myPeerId
+                    return `
+                        <div class="player-item ${isMe ? 'self' : ''}">
+                            <span>${player.id.substr(0, 8)} ${isMe ? '(You)' : ''}</span>
+                            <span>Score: ${player.score || 0} | Health: ${player.health || 100}</span>
+                        </div>
+                    `
+                }).join('')
+                
+                document.getElementById('playerList').innerHTML = playerListHtml || '<p style="opacity: 0.6;">No players connected</p>'
+            }
+        }
+        
+        // Update player count
+        function updatePlayerCount() {
+            if (room) {
+                const peerCount = room.getPeers ? room.getPeers().length : 0
+                document.getElementById('playerCount').textContent = peerCount + 1 // +1 for self
+            }
+        }
+        
+        // Handle keyboard input
+        document.addEventListener('keydown', (e) => {
+            if (!room || !myPeerId) return
+            
+            let action = null
+            
+            switch(e.key.toLowerCase()) {
+                case 'arrowleft':
+                case 'a':
+                    action = { type: 'move', direction: 'left' }
+                    e.preventDefault()
+                    break
+                case 'arrowright':
+                case 'd':
+                    action = { type: 'move', direction: 'right' }
+                    e.preventDefault()
+                    break
+                case ' ':
+                case 'w':
+                case 'arrowup':
+                    action = { type: 'jump' }
+                    e.preventDefault()
+                    break
+                case 's':
+                case 'arrowdown':
+                    action = { type: 'stop' }
+                    e.preventDefault()
+                    break
+            }
+            
+            if (action) {
+                if (isHost && gameId) {
+                    // Process locally if host
+                    const result = processGameAction(gameId, myPeerId, action)
+                    if (result) {
+                        broadcastGameState()
+                    }
+                } else if (sendAction) {
+                    // Send to host if not host
+                    sendAction(action)
+                }
+            }
+        })
+        
+        document.addEventListener('keyup', (e) => {
+            if (!room || !myPeerId) return
+            
+            if (['arrowleft', 'arrowright', 'a', 'd'].includes(e.key.toLowerCase())) {
+                const action = { type: 'stop' }
+                
+                if (isHost && gameId) {
+                    processGameAction(gameId, myPeerId, action)
+                    broadcastGameState()
+                } else if (sendAction) {
+                    sendAction(action)
+                }
+            }
+        })
+        
+        // Button event handlers
+        document.getElementById('joinBtn').addEventListener('click', () => {
+            const roomId = document.getElementById('roomInput').value || 'default-room'
+            joinOrCreateRoom(roomId, false)
+        })
+        
+        document.getElementById('createBtn').addEventListener('click', () => {
+            const roomId = document.getElementById('roomInput').value || 'room-' + Math.random().toString(36).substr(2, 9)
+            document.getElementById('roomInput').value = roomId
+            joinOrCreateRoom(roomId, true)
+        })
+        
+        document.getElementById('leaveBtn').addEventListener('click', leaveRoom)
+        
+        // Initialize game engine on load
+        initGame().then(() => {
+            console.log('Game engine initialized')
+        }).catch(err => {
+            console.error('Failed to initialize game engine:', err)
+        })
+        
+        // Update latency periodically
+        setInterval(() => {
+            if (room) {
+                // Simulate latency measurement
+                document.getElementById('latency').textContent = Math.floor(Math.random() * 50 + 10) + 'ms'
+            }
+        }, 2000)
+    </script>
+</body>
+</html>

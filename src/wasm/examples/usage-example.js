@@ -188,34 +188,93 @@ function renderGame(state) {
   // Clear canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   
+  // Parse state if it's a string (from WASM)
+  const gameState = typeof state === 'string' ? JSON.parse(state) : state
+  
+  // Render obstacles (walls) - draw them first so they appear behind players
+  if (gameState.obstacles) {
+    const obstacles = typeof gameState.obstacles === 'string' 
+      ? JSON.parse(gameState.obstacles) 
+      : gameState.obstacles
+      
+    obstacles.forEach(obstacle => {
+      if (obstacle.type === 'wall') {
+        // Draw wall with gradient for depth
+        const gradient = ctx.createLinearGradient(
+          obstacle.x, obstacle.y,
+          obstacle.x + obstacle.width, obstacle.y + obstacle.height
+        )
+        gradient.addColorStop(0, '#666666')
+        gradient.addColorStop(0.5, '#888888')
+        gradient.addColorStop(1, '#666666')
+        
+        ctx.fillStyle = gradient
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height)
+        
+        // Draw border for better visibility
+        ctx.strokeStyle = '#333333'
+        ctx.lineWidth = 2
+        ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height)
+      }
+    })
+  }
+  
   // Render players
-  if (state.players) {
-    Object.values(state.players).forEach(player => {
+  if (gameState.players) {
+    const players = typeof gameState.players === 'string'
+      ? JSON.parse(gameState.players)
+      : Object.values(gameState.players)
+      
+    players.forEach(player => {
+      // Draw player as circle
       ctx.fillStyle = player.color || '#00ff00'
-      ctx.fillRect(player.x - 10, player.y - 10, 20, 20)
+      ctx.beginPath()
+      ctx.arc(player.x, player.y, 20, 0, Math.PI * 2)
+      ctx.fill()
+      
+      // Draw player outline
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 2
+      ctx.stroke()
       
       // Draw health bar
       ctx.fillStyle = '#ff0000'
-      ctx.fillRect(player.x - 10, player.y - 20, 20, 2)
+      ctx.fillRect(player.x - 20, player.y - 35, 40, 5)
       ctx.fillStyle = '#00ff00'
-      ctx.fillRect(player.x - 10, player.y - 20, (player.health / 100) * 20, 2)
+      ctx.fillRect(player.x - 20, player.y - 35, (player.health / 100) * 40, 5)
       
       // Draw name
       ctx.fillStyle = '#ffffff'
-      ctx.font = '10px Arial'
+      ctx.font = '12px Arial'
       ctx.textAlign = 'center'
-      ctx.fillText(player.id.substr(0, 8), player.x, player.y - 25)
+      const playerId = player.id || 'Player'
+      ctx.fillText(playerId.substr(0, 8), player.x, player.y - 40)
+      
+      // Draw score
+      if (player.score !== undefined) {
+        ctx.fillText(`Score: ${player.score}`, player.x, player.y + 35)
+      }
     })
   }
   
   // Render entities
-  if (state.entities) {
-    state.entities.forEach(entity => {
+  if (gameState.entities) {
+    const entities = typeof gameState.entities === 'string'
+      ? JSON.parse(gameState.entities)
+      : gameState.entities
+      
+    entities.forEach(entity => {
       if (entity.type === 'collectible') {
         ctx.fillStyle = '#ffff00'
         ctx.beginPath()
         ctx.arc(entity.x, entity.y, 10, 0, Math.PI * 2)
         ctx.fill()
+        
+        // Add glow effect
+        ctx.shadowColor = '#ffff00'
+        ctx.shadowBlur = 10
+        ctx.fill()
+        ctx.shadowBlur = 0
       }
     })
   }
@@ -224,8 +283,8 @@ function renderGame(state) {
   ctx.fillStyle = '#ffffff'
   ctx.font = '16px Arial'
   ctx.textAlign = 'left'
-  ctx.fillText(`Tick: ${state.tick || 0}`, 10, 20)
-  ctx.fillText(`State: ${state.state || 'unknown'}`, 10, 40)
+  ctx.fillText(`Tick: ${gameState.tick || 0}`, 10, 20)
+  ctx.fillText(`State: ${gameState.state || 'unknown'}`, 10, 40)
 }
 
 // Example 5: Spectator mode

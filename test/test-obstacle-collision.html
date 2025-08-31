@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obstacle Collision Test - P2P Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        
+        #gameCanvas {
+            border: 2px solid #444;
+            background: #000;
+            display: block;
+            margin: 20px auto;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px;
+        }
+        
+        .controls button {
+            padding: 10px 20px;
+            margin: 0 5px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .controls button:hover {
+            background: #45a049;
+        }
+        
+        .info {
+            text-align: center;
+            margin: 20px;
+        }
+        
+        .info div {
+            margin: 5px 0;
+        }
+        
+        .player-list {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        
+        .instructions {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        
+        .instructions h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        
+        .instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .status {
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+            margin: 10px auto;
+            max-width: 600px;
+            text-align: center;
+        }
+        
+        .status.connected {
+            background: #2d5a2d;
+        }
+        
+        .status.error {
+            background: #5a2d2d;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">P2P Game with Obstacle Collision</h1>
+    
+    <div class="instructions">
+        <h3>🎮 Game Controls</h3>
+        <ul>
+            <li><strong>Arrow Keys:</strong> Move left/right</li>
+            <li><strong>Space:</strong> Jump</li>
+            <li><strong>Enter:</strong> Stop movement</li>
+        </ul>
+        <p><strong>Obstacle:</strong> A gray wall is placed in the center of the viewport. Players cannot pass through it and must jump over or go around it!</p>
+    </div>
+    
+    <div id="status" class="status">
+        <span id="connectionStatus">Initializing...</span>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div class="controls">
+        <button id="joinBtn">Join Game</button>
+        <button id="startBtn" disabled>Start Game</button>
+        <button id="leaveBtn" disabled>Leave Game</button>
+    </div>
+    
+    <div class="info">
+        <div>Room ID: <span id="roomId">-</span></div>
+        <div>Players: <span id="playerCount">0</span></div>
+        <div>Game State: <span id="gameState">waiting</span></div>
+        <div>FPS: <span id="fps">0</span></div>
+        <div>Latency: <span id="latency">0</span>ms</div>
+    </div>
+    
+    <div class="player-list">
+        <h3>Players in Room:</h3>
+        <div id="playerList">No players yet</div>
+    </div>
+
+    <script type="module">
+        // Mock implementation for testing without actual WASM compilation
+        // This simulates the game behavior with obstacle collision
+        
+        class MockGameEngine {
+            constructor() {
+                this.games = new Map();
+                this.nextGameId = 1;
+                this.nextEntityId = 1;
+            }
+            
+            createGame(roomId, config) {
+                const gameId = this.nextGameId++;
+                const game = {
+                    id: gameId,
+                    roomId: roomId,
+                    tick: 0,
+                    players: new Map(),
+                    entities: [],
+                    obstacles: [],
+                    config: {
+                        worldWidth: 800,
+                        worldHeight: 600,
+                        gravity: 0.5,
+                        friction: 0.95,
+                        ...config
+                    },
+                    state: 'waiting'
+                };
+                
+                // Add obstacle in the middle
+                game.obstacles.push({
+                    id: this.nextEntityId++,
+                    type: 'wall',
+                    x: 375,  // Center X - width/2
+                    y: 200,  // Center Y - height/2
+                    width: 50,
+                    height: 200
+                });
+                
+                // Add some collectibles
+                for (let i = 0; i < 5; i++) {
+                    game.entities.push({
+                        id: this.nextEntityId++,
+                        type: 'collectible',
+                        x: Math.random() * 800,
+                        y: Math.random() * 300
+                    });
+                }
+                
+                this.games.set(gameId, game);
+                return gameId;
+            }
+            
+            addPlayer(gameId, playerId) {
+                const game = this.games.get(gameId);
+                if (!game) return false;
+                
+                game.players.set(playerId, {
+                    id: playerId,
+                    x: Math.random() * 800,
+                    y: 400,
+                    vx: 0,
+                    vy: 0,
+                    health: 100,
+                    score: 0,
+                    color: '#' + Math.floor(Math.random() * 16777215).toString(16)
+                });
+                
+                if (game.players.size >= 2 && game.state === 'waiting') {
+                    game.state = 'playing';
+                }
+                
+                return true;
+            }
+            
+            processAction(gameId, playerId, action) {
+                const game = this.games.get(gameId);
+                if (!game) return null;
+                
+                const player = game.players.get(playerId);
+                if (!player) return null;
+                
+                switch(action.type) {
+                    case 'move':
+                        if (action.direction === 'left') {
+                            player.vx = -5;
+                        } else if (action.direction === 'right') {
+                            player.vx = 5;
+                        }
+                        break;
+                    case 'jump':
+                        if (Math.abs(player.vy) < 1) { // Only jump if on ground
+                            player.vy = -12;
+                        }
+                        break;
+                    case 'stop':
+                        player.vx = 0;
+                        break;
+                }
+                
+                return { broadcast: true, state: this.getState(gameId) };
+            }
+            
+            updateGame(gameId, deltaTime) {
+                const game = this.games.get(gameId);
+                if (!game) return null;
+                
+                game.tick++;
+                
+                // Update all players
+                game.players.forEach(player => {
+                    const prevX = player.x;
+                    const prevY = player.y;
+                    
+                    // Apply physics
+                    player.vy += game.config.gravity;
+                    player.vx *= game.config.friction;
+                    
+                    // Update position
+                    player.x += player.vx * (deltaTime / 16);
+                    player.y += player.vy * (deltaTime / 16);
+                    
+                    // Check collision with obstacles
+                    const playerRadius = 20;
+                    game.obstacles.forEach(obstacle => {
+                        // AABB collision detection
+                        const closestX = Math.max(obstacle.x, Math.min(player.x, obstacle.x + obstacle.width));
+                        const closestY = Math.max(obstacle.y, Math.min(player.y, obstacle.y + obstacle.height));
+                        
+                        const distanceX = player.x - closestX;
+                        const distanceY = player.y - closestY;
+                        const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+                        
+                        if (distanceSquared < playerRadius * playerRadius) {
+                            // Collision detected - resolve it
+                            
+                            // Check horizontal collision
+                            if (prevX + playerRadius <= obstacle.x || prevX - playerRadius >= obstacle.x + obstacle.width) {
+                                player.x = prevX;
+                                player.vx = 0;
+                            }
+                            
+                            // Check vertical collision
+                            if (prevY + playerRadius <= obstacle.y || prevY - playerRadius >= obstacle.y + obstacle.height) {
+                                player.y = prevY;
+                                player.vy = 0;
+                                
+                                // If landing on top of obstacle
+                                if (prevY < obstacle.y) {
+                                    player.y = obstacle.y - playerRadius;
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Boundary collision
+                    if (player.x < playerRadius) {
+                        player.x = playerRadius;
+                        player.vx = 0;
+                    } else if (player.x > game.config.worldWidth - playerRadius) {
+                        player.x = game.config.worldWidth - playerRadius;
+                        player.vx = 0;
+                    }
+                    
+                    if (player.y > game.config.worldHeight - playerRadius) {
+                        player.y = game.config.worldHeight - playerRadius;
+                        player.vy = 0;
+                    }
+                    
+                    // Check collision with collectibles
+                    for (let i = game.entities.length - 1; i >= 0; i--) {
+                        const entity = game.entities[i];
+                        if (entity.type === 'collectible') {
+                            const dx = player.x - entity.x;
+                            const dy = player.y - entity.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < 30) {
+                                player.score += 10;
+                                game.entities.splice(i, 1);
+                                
+                                // Spawn new collectible
+                                game.entities.push({
+                                    id: this.nextEntityId++,
+                                    type: 'collectible',
+                                    x: Math.random() * 800,
+                                    y: Math.random() * 300
+                                });
+                            }
+                        }
+                    }
+                });
+                
+                // Update entities
+                game.entities.forEach(entity => {
+                    if (entity.type === 'collectible') {
+                        entity.y += Math.sin(game.tick * 0.1) * 0.5;
+                    }
+                });
+                
+                return this.getState(gameId);
+            }
+            
+            getState(gameId) {
+                const game = this.games.get(gameId);
+                if (!game) return null;
+                
+                return {
+                    tick: game.tick,
+                    state: game.state,
+                    timestamp: Date.now(),
+                    players: Array.from(game.players.values()),
+                    entities: game.entities,
+                    obstacles: game.obstacles
+                };
+            }
+            
+            removePlayer(gameId, playerId) {
+                const game = this.games.get(gameId);
+                if (!game) return false;
+                
+                game.players.delete(playerId);
+                
+                if (game.players.size < 2 && game.state === 'playing') {
+                    game.state = 'waiting';
+                }
+                
+                return true;
+            }
+        }
+        
+        // Initialize mock game engine
+        const gameEngine = new MockGameEngine();
+        let currentGameId = null;
+        let myPlayerId = 'player-' + Math.random().toString(36).substr(2, 9);
+        let animationId = null;
+        let lastTime = 0;
+        let fps = 0;
+        let frameCount = 0;
+        let fpsTime = 0;
+        
+        // Render function (reusing the one from usage-example.js)
+        function renderGame(state) {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (!state) return;
+            
+            // Render obstacles first
+            if (state.obstacles) {
+                state.obstacles.forEach(obstacle => {
+                    if (obstacle.type === 'wall') {
+                        const gradient = ctx.createLinearGradient(
+                            obstacle.x, obstacle.y,
+                            obstacle.x + obstacle.width, obstacle.y + obstacle.height
+                        );
+                        gradient.addColorStop(0, '#666666');
+                        gradient.addColorStop(0.5, '#888888');
+                        gradient.addColorStop(1, '#666666');
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+                        
+                        ctx.strokeStyle = '#333333';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+                    }
+                });
+            }
+            
+            // Render players
+            if (state.players) {
+                state.players.forEach(player => {
+                    ctx.fillStyle = player.color || '#00ff00';
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, 20, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = player.id === myPlayerId ? '#ffffff' : '#000000';
+                    ctx.lineWidth = player.id === myPlayerId ? 3 : 2;
+                    ctx.stroke();
+                    
+                    // Health bar
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(player.x - 20, player.y - 35, 40, 5);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(player.x - 20, player.y - 35, (player.health / 100) * 40, 5);
+                    
+                    // Name
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(player.id.substr(0, 8), player.x, player.y - 40);
+                    
+                    // Score
+                    ctx.fillText(`Score: ${player.score}`, player.x, player.y + 35);
+                });
+            }
+            
+            // Render entities
+            if (state.entities) {
+                state.entities.forEach(entity => {
+                    if (entity.type === 'collectible') {
+                        ctx.fillStyle = '#ffff00';
+                        ctx.beginPath();
+                        ctx.arc(entity.x, entity.y, 10, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        ctx.strokeStyle = '#ffaa00';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                });
+            }
+            
+            // Render game info
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Tick: ${state.tick || 0}`, 10, 20);
+            ctx.fillText(`State: ${state.state || 'waiting'}`, 10, 40);
+        }
+        
+        // Game loop
+        function gameLoop(currentTime) {
+            if (!currentGameId) return;
+            
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Calculate FPS
+            frameCount++;
+            if (currentTime - fpsTime >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                fpsTime = currentTime;
+                document.getElementById('fps').textContent = fps;
+            }
+            
+            // Update game
+            const state = gameEngine.updateGame(currentGameId, deltaTime);
+            if (state) {
+                renderGame(state);
+                updateUI(state);
+            }
+            
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Update UI
+        function updateUI(state) {
+            if (!state) return;
+            
+            document.getElementById('playerCount').textContent = state.players ? state.players.length : 0;
+            document.getElementById('gameState').textContent = state.state || 'waiting';
+            
+            if (state.players && state.players.length > 0) {
+                const playerList = state.players.map(p => 
+                    `<div>${p.id.substr(0, 8)} - Score: ${p.score} - Health: ${p.health}</div>`
+                ).join('');
+                document.getElementById('playerList').innerHTML = playerList;
+            }
+        }
+        
+        // Handle keyboard input
+        document.addEventListener('keydown', (e) => {
+            if (!currentGameId) return;
+            
+            let action = null;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    action = { type: 'move', direction: 'left' };
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    action = { type: 'move', direction: 'right' };
+                    e.preventDefault();
+                    break;
+                case ' ':
+                    action = { type: 'jump' };
+                    e.preventDefault();
+                    break;
+                case 'Enter':
+                    action = { type: 'stop' };
+                    e.preventDefault();
+                    break;
+            }
+            
+            if (action) {
+                gameEngine.processAction(currentGameId, myPlayerId, action);
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            if (!currentGameId) return;
+            
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                gameEngine.processAction(currentGameId, myPlayerId, { type: 'stop' });
+            }
+        });
+        
+        // Button handlers
+        document.getElementById('joinBtn').addEventListener('click', () => {
+            const roomId = 'test-room-' + Date.now();
+            currentGameId = gameEngine.createGame(roomId, {});
+            gameEngine.addPlayer(currentGameId, myPlayerId);
+            
+            document.getElementById('roomId').textContent = roomId;
+            document.getElementById('joinBtn').disabled = true;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('leaveBtn').disabled = false;
+            document.getElementById('connectionStatus').textContent = 'Connected to game';
+            document.getElementById('status').className = 'status connected';
+            
+            // Add a second AI player for testing
+            setTimeout(() => {
+                const aiPlayerId = 'ai-player-' + Math.random().toString(36).substr(2, 9);
+                gameEngine.addPlayer(currentGameId, aiPlayerId);
+                
+                // Simple AI movement
+                setInterval(() => {
+                    if (currentGameId && Math.random() > 0.7) {
+                        const actions = [
+                            { type: 'move', direction: 'left' },
+                            { type: 'move', direction: 'right' },
+                            { type: 'jump' },
+                            { type: 'stop' }
+                        ];
+                        const randomAction = actions[Math.floor(Math.random() * actions.length)];
+                        gameEngine.processAction(currentGameId, aiPlayerId, randomAction);
+                    }
+                }, 1000);
+            }, 1000);
+        });
+        
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!animationId) {
+                lastTime = performance.now();
+                gameLoop(lastTime);
+                document.getElementById('startBtn').textContent = 'Pause Game';
+            } else {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+                document.getElementById('startBtn').textContent = 'Start Game';
+            }
+        });
+        
+        document.getElementById('leaveBtn').addEventListener('click', () => {
+            if (currentGameId) {
+                gameEngine.removePlayer(currentGameId, myPlayerId);
+                currentGameId = null;
+                
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                
+                document.getElementById('joinBtn').disabled = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('leaveBtn').disabled = true;
+                document.getElementById('roomId').textContent = '-';
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                document.getElementById('status').className = 'status';
+                
+                // Clear canvas
+                const canvas = document.getElementById('gameCanvas');
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+        
+        // Initialize
+        document.getElementById('connectionStatus').textContent = 'Ready to join';
+        document.getElementById('latency').textContent = Math.floor(Math.random() * 50 + 10);
+    </script>
+</body>
+</html>

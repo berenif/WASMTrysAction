@@ -12,6 +12,7 @@ class GameInstance {
   tick: i32
   players: Map<string, Player>
   entities: Array<Entity>
+  obstacles: Array<Obstacle>
   config: GameConfig
   state: string
   
@@ -21,8 +22,30 @@ class GameInstance {
     this.tick = 0
     this.players = new Map()
     this.entities = new Array()
+    this.obstacles = new Array()
     this.config = config
     this.state = 'waiting'
+    
+    // Initialize obstacle in the middle of the viewport
+    this.initializeObstacles()
+  }
+  
+  initializeObstacles(): void {
+    // Add a wall obstacle in the middle of the viewport
+    const centerX = this.config.worldWidth / 2
+    const centerY = this.config.worldHeight / 2
+    const wallWidth = 50
+    const wallHeight = 200
+    
+    const obstacle = new Obstacle(
+      nextEntityId++,
+      centerX - wallWidth / 2,
+      centerY - wallHeight / 2,
+      wallWidth,
+      wallHeight
+    )
+    
+    this.obstacles.push(obstacle)
   }
 }
 
@@ -61,6 +84,24 @@ class Entity {
     this.x = x
     this.y = y
     this.data = ''
+  }
+}
+
+class Obstacle {
+  id: i32
+  x: f32
+  y: f32
+  width: f32
+  height: f32
+  type: string
+  
+  constructor(id: i32, x: f32, y: f32, width: f32, height: f32) {
+    this.id = id
+    this.x = x
+    this.y = y
+    this.width = width
+    this.height = height
+    this.type = 'wall'
   }
 }
 
@@ -185,6 +226,10 @@ export function update_game(gameId: i32, deltaTime: f32): i32 {
   for (let i = 0; i < players.length; i++) {
     const player = players[i]
     
+    // Store previous position for collision resolution
+    const prevX = player.x
+    const prevY = player.y
+    
     // Apply physics
     player.vy += game.config.gravity
     player.vx *= game.config.friction
@@ -192,6 +237,46 @@ export function update_game(gameId: i32, deltaTime: f32): i32 {
     // Update position
     player.x += player.vx * (deltaTime / 16.0)
     player.y += player.vy * (deltaTime / 16.0)
+    
+    // Check collision with obstacles
+    const playerSize = 20 // Assume player has a radius of 20
+    for (let j = 0; j < game.obstacles.length; j++) {
+      const obstacle = game.obstacles[j]
+      
+      // AABB collision detection (player as circle vs obstacle as rectangle)
+      const closestX = Math.max(obstacle.x, Math.min(player.x, obstacle.x + obstacle.width))
+      const closestY = Math.max(obstacle.y, Math.min(player.y, obstacle.y + obstacle.height))
+      
+      const distanceX = player.x - closestX
+      const distanceY = player.y - closestY
+      const distanceSquared = distanceX * distanceX + distanceY * distanceY
+      
+      if (distanceSquared < playerSize * playerSize) {
+        // Collision detected - resolve it
+        // Determine which side the collision occurred from
+        const dx = player.x - prevX
+        const dy = player.y - prevY
+        
+        // Check horizontal collision
+        if (prevX + playerSize <= obstacle.x || prevX - playerSize >= obstacle.x + obstacle.width) {
+          // Horizontal collision - stop horizontal movement
+          player.x = prevX
+          player.vx = 0
+        }
+        
+        // Check vertical collision
+        if (prevY + playerSize <= obstacle.y || prevY - playerSize >= obstacle.y + obstacle.height) {
+          // Vertical collision - stop vertical movement
+          player.y = prevY
+          player.vy = 0
+          
+          // If landing on top of obstacle, allow jumping
+          if (prevY < obstacle.y) {
+            player.y = obstacle.y - playerSize
+          }
+        }
+      }
+    }
     
     // Boundary collision
     if (player.x < 0) {
@@ -317,12 +402,26 @@ function serializeGameState(game: GameInstance): string {
     }))
   }
   
+  const obstacles: Array<string> = []
+  for (let i = 0; i < game.obstacles.length; i++) {
+    const obstacle = game.obstacles[i]
+    obstacles.push(JSON.stringify({
+      id: obstacle.id,
+      type: obstacle.type,
+      x: obstacle.x,
+      y: obstacle.y,
+      width: obstacle.width,
+      height: obstacle.height
+    }))
+  }
+  
   return JSON.stringify({
     tick: game.tick,
     state: game.state,
     timestamp: Date.now(),
     players: '[' + players.join(',') + ']',
-    entities: '[' + entities.join(',') + ']'
+    entities: '[' + entities.join(',') + ']',
+    obstacles: '[' + obstacles.join(',') + ']'
   })
 }
 
