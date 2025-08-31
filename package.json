@@ -56,6 +56,8 @@
   "scripts": {
     "build": "rollup -c",
     "build-wasm": "node scripts/build-wasm.js",
+    "build-roguelike": "cd roguelike-wasm && wasm-pack build --target web --out-dir ../docs/wasm",
+    "serve-roguelike": "cd docs && python3 -m http.server 8080",
     "get-bundle-sizes": "node scripts/get-bundle-sizes.js",
     "test": "playwright test ./test",
     "test-proxy": "PROXY=$(node scripts/find-proxy.js) npm run test",
