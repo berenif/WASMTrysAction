@@ -1,4 +1,4 @@
-import {joinRoom, selfId} from 'https://esm.run/trystero'
+import {joinRoom, selfId} from './trystero-torrent.min.js'
 
 const byId = document.getElementById.bind(document)
 const canvas = byId('canvas')
