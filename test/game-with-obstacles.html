@@ -379,10 +379,17 @@
             })
             
             // Handle game state updates from host
-            getState((state, peerId) => {
+            getState((stateData, peerId) => {
                 if (!isHost) {
+                    // Extract the actual state from the sync data
+                    const state = stateData.state || stateData
                     renderGameState(state)
                     updateUI(state)
+                    
+                    // If this is a full sync (new player joining), ensure we have the complete map
+                    if (stateData.fullSync) {
+                        console.log('Received full game state sync with map')
+                    }
                 }
             })
             
