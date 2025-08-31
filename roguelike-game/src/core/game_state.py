@@ -18,8 +18,8 @@ class Biome(Enum):
 @dataclass
 class Player:
     """Player character state."""
-    x: int = 0
-    y: int = 0
+    x: float = 0.0
+    y: float = 0.0
     hp: int = 100
     max_hp: int = 100
     stamina: int = 100
@@ -49,8 +49,8 @@ class Player:
 @dataclass
 class Enemy:
     """Enemy entity."""
-    x: int
-    y: int
+    x: float
+    y: float
     hp: int
     max_hp: int
     damage: int
@@ -141,8 +141,8 @@ class GameState:
         # Place player in first room
         if self.rooms:
             first_room = self.rooms[0]
-            self.player.x = first_room.x + first_room.width // 2
-            self.player.y = first_room.y + first_room.height // 2
+            self.player.x = float(first_room.x + first_room.width / 2)
+            self.player.y = float(first_room.y + first_room.height / 2)
             first_room.discovered = True
     
     def create_room(self, index: int) -> Room:
@@ -190,8 +190,8 @@ class GameState:
     def create_enemy(self, room: Room) -> Enemy:
         """Create an enemy."""
         # Random position within room
-        x = room.x + random.randint(1, room.width - 1)
-        y = room.y + random.randint(1, room.height - 1)
+        x = float(room.x + random.randint(1, room.width - 1))
+        y = float(room.y + random.randint(1, room.height - 1))
         
         # Scale stats based on floor
         hp_scale = self.settings.HP_SCALE_PER_FLOOR ** (self.current_floor - 1)
