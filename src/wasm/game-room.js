@@ -37,12 +37,18 @@ export const defaultGameConfig = {
 export const createGameRoom = async (room, wasmSource, gameConfig = {}) => {
   const config = {...defaultGameConfig, ...gameConfig}
   
+  // Ensure consistent map seed for all players in the room
+  if (!config.mapSeed) {
+    // Use room ID as seed to ensure all players get the same map
+    config.mapSeed = room.roomId
+  }
+  
   // Initialize WASM if not already done
   if (!isInitialized() && wasmSource) {
     await initGameEngine(wasmSource)
   }
 
-  // Create game instance for this room
+  // Create game instance for this room - all players will share this instance
   const gameId = createGameInstance(room.roomId, config)
   
   // Game state management
@@ -289,12 +295,24 @@ export const createGameRoom = async (room, wasmSource, gameConfig = {}) => {
   receivePlayerJoin((data, peerId) => {
     const {playerId, playerData} = data
     
-    // Add player to game
+    // Add player to the same game instance
     if (addPlayer(gameId, playerId || peerId, playerData)) {
       playerStates.set(playerId || peerId, {
         ...playerData,
         joinedAt: Date.now()
       })
+      
+      // If we're the host, immediately send the full game state to the new player
+      if (isHost) {
+        const state = getGameState(gameId)
+        // Send state directly to the new player
+        sendStateSync({
+          state,
+          timestamp: Date.now(),
+          tick: state?.tick || 0,
+          fullSync: true // Flag to indicate this is a full state sync for new player
+        })
+      }
       
       if (gameRoom.onPlayerGameJoin) {
         gameRoom.onPlayerGameJoin(playerId || peerId, playerData)
@@ -336,7 +354,7 @@ export const createGameRoom = async (room, wasmSource, gameConfig = {}) => {
   // Hook into room peer events
   const originalOnPeerJoin = room.onPeerJoin
   room.onPeerJoin = (peerId) => {
-    // Send player join notification
+    // Send player join notification with current game state
     sendPlayerJoin({
       playerId: room.selfId,
       playerData: {
@@ -344,9 +362,19 @@ export const createGameRoom = async (room, wasmSource, gameConfig = {}) => {
       }
     })
     
-    // Add peer as player
+    // Add peer as player to the same game instance
     addPlayer(gameId, peerId, {})
     playerStates.set(peerId, {joinedAt: Date.now()})
+    
+    // If we're the host, send the current game state to the new player
+    if (isHost) {
+      const state = getGameState(gameId)
+      sendStateSync({
+        state,
+        timestamp: Date.now(),
+        tick: state?.tick || 0
+      })
+    }
     
     // Determine host (first player becomes host)
     if (!isHost && playerStates.size === 1) {

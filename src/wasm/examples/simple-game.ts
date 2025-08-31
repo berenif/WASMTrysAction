@@ -31,14 +31,16 @@ class GameInstance {
   }
   
   initializeObstacles(): void {
-    // Add a wall obstacle in the middle of the viewport
+    // Add a consistent wall obstacle in the middle of the viewport
+    // Using fixed positions to ensure all players see the same obstacles
     const centerX = this.config.worldWidth / 2
     const centerY = this.config.worldHeight / 2
     const wallWidth = 50
     const wallHeight = 200
     
+    // Main center wall - same for all players
     const obstacle = new Obstacle(
-      nextEntityId++,
+      1000, // Use fixed ID for consistent obstacle
       centerX - wallWidth / 2,
       centerY - wallHeight / 2,
       wallWidth,
@@ -46,6 +48,26 @@ class GameInstance {
     )
     
     this.obstacles.push(obstacle)
+    
+    // Add additional consistent obstacles if needed
+    // These will be the same for all players in the room
+    const leftWall = new Obstacle(
+      1001,
+      100,
+      400,
+      30,
+      100
+    )
+    this.obstacles.push(leftWall)
+    
+    const rightWall = new Obstacle(
+      1002,
+      670,
+      400,
+      30,
+      100
+    )
+    this.obstacles.push(rightWall)
   }
 }
 
@@ -59,10 +81,26 @@ class Player {
   score: i32
   color: string
   
-  constructor(id: string) {
+  constructor(id: string, spawnX: f32 = -1, spawnY: f32 = -1) {
     this.id = id
-    this.x = Math.random() * 800
-    this.y = Math.random() * 600
+    // Use provided spawn position or generate a safe spawn position
+    if (spawnX >= 0 && spawnY >= 0) {
+      this.x = spawnX
+      this.y = spawnY
+    } else {
+      // Spawn in safe zones away from the center obstacle
+      // The obstacle is at center (375-425, 200-400)
+      const side = Math.random() < 0.5 ? 0 : 1
+      if (side === 0) {
+        // Spawn on left side of obstacle
+        this.x = Math.random() * 350
+      } else {
+        // Spawn on right side of obstacle
+        this.x = 450 + Math.random() * 350
+      }
+      // Spawn at ground level
+      this.y = 550
+    }
     this.vx = 0
     this.vy = 0
     this.health = 100
@@ -111,6 +149,7 @@ class GameConfig {
   worldHeight: f32
   gravity: f32
   friction: f32
+  mapSeed: string
   
   constructor() {
     this.maxPlayers = 8
@@ -118,6 +157,7 @@ class GameConfig {
     this.worldHeight = 600
     this.gravity = 0.5
     this.friction = 0.95
+    this.mapSeed = ''
   }
 }
 
@@ -324,6 +364,7 @@ export function add_player(gameId: i32, playerIdPtr: i32, dataPtr: i32): i32 {
     return 0
   }
   
+  // Create player with safe spawn position
   const player = new Player(playerId)
   game.players.set(playerId, player)
   
@@ -416,9 +457,13 @@ function serializeGameState(game: GameInstance): string {
   }
   
   return JSON.stringify({
+    gameId: game.id,
+    roomId: game.roomId,
     tick: game.tick,
     state: game.state,
     timestamp: Date.now(),
+    worldWidth: game.config.worldWidth,
+    worldHeight: game.config.worldHeight,
     players: '[' + players.join(',') + ']',
     entities: '[' + entities.join(',') + ']',
     obstacles: '[' + obstacles.join(',') + ']'
