@@ -13,7 +13,8 @@
     "./mqtt": "./src/mqtt.js",
     "./nostr": "./src/nostr.js",
     "./supabase": "./src/supabase.js",
-    "./torrent": "./src/torrent.js"
+    "./torrent": "./src/torrent.js",
+    "./game": "./src/game.js"
   },
   "author": {
     "name": "Dan Motzenbecker",
@@ -54,6 +55,7 @@
   },
   "scripts": {
     "build": "rollup -c",
+    "build-wasm": "node scripts/build-wasm.js",
     "get-bundle-sizes": "node scripts/get-bundle-sizes.js",
     "test": "playwright test ./test",
     "test-proxy": "PROXY=$(node scripts/find-proxy.js) npm run test",

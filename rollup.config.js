@@ -39,7 +39,7 @@ const config = {
   ]
 }
 
-export default ['firebase', 'ipfs', 'mqtt', 'nostr', 'supabase', 'torrent'].map(
+export default ['firebase', 'ipfs', 'mqtt', 'nostr', 'supabase', 'torrent', 'game'].map(
   name => ({
     ...config,
     input: `src/${name}.js`,
