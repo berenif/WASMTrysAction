@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes"
     />
     <meta name="author" content="Dan Motzenbecker" />
     <meta
@@ -42,7 +42,8 @@
 
       <p>
         Anyone on this page will connect directly to others in real-time,
-        syncing mouse movement and clicks. (Try it, I dare you).
+        syncing cursor movement and clicks. Use your mouse or keyboard
+        (WASD/ZQSD + Space) to control your cursor. (Try it, I dare you).
       </p>
 
       <p>
@@ -99,8 +100,18 @@ const [sendClick, getClick] = room.makeAction('click')
 
       <p>Broadcast your actions to other peers:</p>
 
-      <pre><code>window.addEventListener('mousemove', e => sendMove([e.clientX, e.clientY]))
-window.addEventListener('click', () => sendClick(randomFruit())
+      <pre><code>// Mouse controls
+window.addEventListener('mousemove', e => sendMove([e.clientX, e.clientY]))
+window.addEventListener('click', () => sendClick(randomFruit()))
+
+// Keyboard controls (WASD/ZQSD)
+window.addEventListener('keydown', e => {
+  if (['w','a','s','d'].includes(e.key.toLowerCase())) {
+    updatePosition(e.key)
+    sendMove([x, y])
+  }
+  if (e.key === ' ') sendClick(randomFruit())
+})
 </code></pre>
 
       <p>And listen for when peers send theirs:</p>

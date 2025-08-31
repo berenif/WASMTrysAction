@@ -32,26 +32,36 @@ let mouseY = 0
 let room
 let sendMove
 let sendClick
+let keyboardLayout = 'QWERTY' // Will be detected automatically
+let moveSpeed = 0.02 // Speed of keyboard movement
+let isKeyboardMode = false
+let keysPressed = new Set()
 
 init(49)
 document.documentElement.className = 'ready'
 addCursor(selfId, true)
+detectKeyboardLayout()
+initKeyboardControls()
 
 addEventListener('mousemove', ({clientX, clientY}) => {
-  mouseX = clientX / innerWidth
-  mouseY = clientY / innerHeight
-  moveCursor([mouseX, mouseY], selfId)
-  if (room) {
-    sendMove([mouseX, mouseY])
+  if (!isKeyboardMode) {
+    mouseX = clientX / innerWidth
+    mouseY = clientY / innerHeight
+    moveCursor([mouseX, mouseY], selfId)
+    if (room) {
+      sendMove([mouseX, mouseY])
+    }
   }
 })
 
 addEventListener('click', () => {
-  const payload = [randomFruit(), mouseX, mouseY]
+  if (!isKeyboardMode) {
+    const payload = [randomFruit(), mouseX, mouseY]
 
-  dropFruit(payload)
-  if (room) {
-    sendClick(payload)
+    dropFruit(payload)
+    if (room) {
+      sendClick(payload)
+    }
   }
 })
 
@@ -144,4 +154,150 @@ function dropFruit([fruitIndex, x, y]) {
   el.style.top = y * innerHeight + 'px'
   canvas.appendChild(el)
   setTimeout(() => canvas.removeChild(el), 3000)
+}
+
+function detectKeyboardLayout() {
+  // Detect keyboard layout based on common key codes
+  // This is a simplified detection - could be enhanced with more sophisticated methods
+  addEventListener('keydown', function detectLayout(e) {
+    if (e.code === 'KeyW' || e.code === 'KeyZ') {
+      // If pressing physical W key, check what character it produces
+      if (e.key.toLowerCase() === 'z') {
+        keyboardLayout = 'AZERTY'
+        console.log('AZERTY keyboard detected')
+      } else {
+        keyboardLayout = 'QWERTY'
+        console.log('QWERTY keyboard detected')
+      }
+      removeEventListener('keydown', detectLayout)
+    }
+  })
+}
+
+function initKeyboardControls() {
+  let animationFrameId = null
+  
+  // Key mappings for both layouts
+  const keyMappings = {
+    QWERTY: {
+      up: ['w', 'arrowup'],
+      down: ['s', 'arrowdown'],
+      left: ['a', 'arrowleft'],
+      right: ['d', 'arrowright'],
+      action: [' ', 'enter']
+    },
+    AZERTY: {
+      up: ['z', 'arrowup'],
+      down: ['s', 'arrowdown'],
+      left: ['q', 'arrowleft'],
+      right: ['d', 'arrowright'],
+      action: [' ', 'enter']
+    }
+  }
+  
+  function updatePosition() {
+    const keys = keyMappings[keyboardLayout]
+    let dx = 0
+    let dy = 0
+    
+    // Check movement keys
+    keys.up.forEach(key => {
+      if (keysPressed.has(key)) dy -= moveSpeed
+    })
+    keys.down.forEach(key => {
+      if (keysPressed.has(key)) dy += moveSpeed
+    })
+    keys.left.forEach(key => {
+      if (keysPressed.has(key)) dx -= moveSpeed
+    })
+    keys.right.forEach(key => {
+      if (keysPressed.has(key)) dx += moveSpeed
+    })
+    
+    if (dx !== 0 || dy !== 0) {
+      // Update position with bounds checking
+      mouseX = Math.max(0, Math.min(1, mouseX + dx))
+      mouseY = Math.max(0, Math.min(1, mouseY + dy))
+      
+      moveCursor([mouseX, mouseY], selfId)
+      if (room) {
+        sendMove([mouseX, mouseY])
+      }
+    }
+    
+    if (keysPressed.size > 0) {
+      animationFrameId = requestAnimationFrame(updatePosition)
+    }
+  }
+  
+  addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase()
+    
+    // Switch to keyboard mode on first WASD/ZQSD key press
+    const keys = keyMappings[keyboardLayout]
+    const allKeys = [...keys.up, ...keys.down, ...keys.left, ...keys.right, ...keys.action]
+    
+    if (allKeys.includes(key)) {
+      e.preventDefault()
+      
+      if (!isKeyboardMode) {
+        isKeyboardMode = true
+        document.documentElement.classList.add('keyboard-mode')
+        // Initialize cursor position to center if not visible
+        if (mouseX === 0 && mouseY === 0) {
+          mouseX = 0.5
+          mouseY = 0.5
+          moveCursor([mouseX, mouseY], selfId)
+        }
+      }
+      
+      // Handle action keys (space/enter for dropping fruit)
+      if (keys.action.includes(key) && !keysPressed.has(key)) {
+        const payload = [randomFruit(), mouseX, mouseY]
+        dropFruit(payload)
+        if (room) {
+          sendClick(payload)
+        }
+      }
+      
+      if (!keysPressed.has(key)) {
+        keysPressed.add(key)
+        if (animationFrameId === null) {
+          animationFrameId = requestAnimationFrame(updatePosition)
+        }
+      }
+    }
+  })
+  
+  addEventListener('keyup', (e) => {
+    const key = e.key.toLowerCase()
+    keysPressed.delete(key)
+    
+    if (keysPressed.size === 0 && animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId)
+      animationFrameId = null
+    }
+  })
+  
+  // Switch back to mouse mode on mouse movement
+  addEventListener('mousemove', () => {
+    if (isKeyboardMode) {
+      isKeyboardMode = false
+      document.documentElement.classList.remove('keyboard-mode')
+    }
+  })
+  
+  // Add visual indicator for controls
+  const controlsIndicator = document.createElement('div')
+  controlsIndicator.id = 'controls-indicator'
+  controlsIndicator.innerHTML = `
+    <div class="control-mode">
+      <span class="mouse-mode">🖱️ Mouse Mode</span>
+      <span class="keyboard-mode-text">⌨️ Keyboard Mode (${keyboardLayout === 'AZERTY' ? 'ZQSD' : 'WASD'})</span>
+    </div>
+    <div class="control-hint">
+      Use ${keyboardLayout === 'AZERTY' ? 'ZQSD' : 'WASD'} or Arrow Keys to move • Space/Enter to drop fruit
+    </div>
+  `
+  document.body.appendChild(controlsIndicator)
 }
