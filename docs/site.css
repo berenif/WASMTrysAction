@@ -26,6 +26,15 @@ body {
   overflow-x: hidden;
 }
 
+#gameCanvas {
+  display: block;
+  margin: 20px auto;
+  cursor: crosshair;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
 .ready:not(.keyboard-mode),
 .ready:not(.keyboard-mode) a:hover {
   cursor: none;

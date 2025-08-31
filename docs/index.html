@@ -22,6 +22,7 @@
   </head>
   <body>
     <div id="canvas"></div>
+    <canvas id="gameCanvas" width="800" height="400" style="display: none; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; background: rgba(0,0,0,0.8); box-shadow: 0 10px 30px rgba(0,0,0,0.5);"></canvas>
     <header>
       <h1>🤝 Trystero<sup>0.21.8</sup></h1>
       <h2>Make any site multiplayer in a few lines.</h2>
@@ -45,6 +46,24 @@
         syncing cursor movement and clicks. Use your mouse or keyboard
         (WASD/ZQSD + Space) to control your cursor. (Try it, I dare you).
       </p>
+
+      <div id="game-mode-toggle" style="margin: 20px 0; text-align: center;">
+        <button id="toggle-game-btn" style="padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 16px; transition: all 0.3s;">
+          🎮 Try WASM Game Mode with Collision Obstacles
+        </button>
+      </div>
+
+      <div id="game-info" style="display: none; margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+        <h3 style="color: #ffd700; margin-bottom: 10px;">🎯 WASM Game Features</h3>
+        <p><strong>New!</strong> Experience real-time P2P gaming with WebAssembly-powered collision detection:</p>
+        <ul style="list-style: none; padding: 0;">
+          <li>→ <strong>Arrow Keys/WASD:</strong> Move your player</li>
+          <li>→ <strong>Space:</strong> Jump over obstacles</li>
+          <li>→ <strong>Red Walls:</strong> Collision obstacles that block movement</li>
+          <li>→ <strong>Gold Coins:</strong> Collect to increase score</li>
+        </ul>
+        <p style="margin-top: 10px; color: #ffd700;">Players: <span id="game-players">1</span> | Score: <span id="game-score">0</span> | FPS: <span id="game-fps">0</span></p>
+      </div>
 
       <p>
         Trystero can connect peers via
@@ -127,6 +146,48 @@ getClick((fruit, peerId) => dropFruitFrom(peerId, fruit))
           >Peruse the readme to see how.</a
         >
       </p>
+
+      <hr />
+
+      <p>Want to add game logic with collision detection? Use the WASM game module:</p>
+
+      <pre><code>// Initialize WASM game engine with collision obstacles
+import {initGameEngine, createGameInstance} from 'trystero/game'
+
+// Load your WASM game module
+await initGameEngine('./game.wasm')
+
+// Create a game instance with obstacles
+const gameId = createGameInstance(room.id, {
+  maxPlayers: 8,
+  worldWidth: 800,
+  worldHeight: 400,
+  obstacles: [
+    {x: 375, y: 100, width: 50, height: 200, type: 'wall'},
+    {x: 200, y: 250, width: 100, height: 30, type: 'platform'}
+  ]
+})
+</code></pre>
+
+      <p>Handle collision detection and physics automatically:</p>
+
+      <pre><code>// Process player actions with collision detection
+room.onPeerJoin(peerId => addPlayer(gameId, peerId))
+
+// Game actions respect obstacle collisions
+const [sendAction, getAction] = room.makeAction('gameAction')
+getAction((action, peerId) => {
+  // WASM engine handles collision detection
+  processGameAction(gameId, peerId, action)
+})
+
+// Update game physics at 60 FPS
+const gameLoop = () => {
+  const state = updateGame(gameId, 16.67) // ~60 FPS
+  renderGameState(state) // Obstacles and collisions included
+  requestAnimationFrame(gameLoop)
+}
+</code></pre>
 
       <hr />
 
