@@ -171,9 +171,11 @@ pre {
 }
 
 .cursor img {
-  width: 34px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
 
 .cursor p {
@@ -246,7 +248,7 @@ pre {
 }
 
 .keyboard-mode .cursor.self img {
-  filter: hue-rotate(180deg);
+  /* Animation is handled by JavaScript frame cycling */
 }
 
 /* Improved responsive design */
