@@ -6,6 +6,13 @@ const peerInfo = byId('peer-info')
 const noPeersCopy = peerInfo.innerText
 const config = {appId: 'trystero-demo1'}
 const cursors = {}
+const knightFrames = [
+  'images/knight1.png',
+  'images/knight2.png', 
+  'images/knight3.png'
+]
+let currentFrame = 0
+const animationSpeed = 500 // milliseconds per frame
 const fruits = [
   '🍏',
   '🍎',
@@ -110,7 +117,32 @@ function addCursor(id, isSelf) {
 
   el.className = `cursor${isSelf ? ' self' : ''}`
   el.style.left = el.style.top = '-99px'
-  img.src = 'images/hand.png'
+  
+  // Start with first knight frame
+  img.src = knightFrames[0]
+  img.dataset.frameIndex = '0'
+  
+  // Set up animation for self cursor
+  if (isSelf) {
+    setInterval(() => {
+      const frameIndex = (parseInt(img.dataset.frameIndex) + 1) % knightFrames.length
+      img.src = knightFrames[frameIndex]
+      img.dataset.frameIndex = frameIndex.toString()
+    }, animationSpeed)
+  } else {
+    // For other cursors, use a random starting frame
+    const startFrame = Math.floor(Math.random() * knightFrames.length)
+    img.src = knightFrames[startFrame]
+    img.dataset.frameIndex = startFrame.toString()
+    
+    // Animate other cursors too
+    setInterval(() => {
+      const frameIndex = (parseInt(img.dataset.frameIndex) + 1) % knightFrames.length
+      img.src = knightFrames[frameIndex]
+      img.dataset.frameIndex = frameIndex.toString()
+    }, animationSpeed)
+  }
+  
   txt.innerText = isSelf ? 'you' : id.slice(0, 4)
   el.appendChild(img)
   el.appendChild(txt)
