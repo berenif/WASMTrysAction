@@ -1,77 +1,37 @@
 #!/usr/bin/env node
 
-/**
- * Build script for compiling AssemblyScript games to WASM
- */
+import { execSync } from 'child_process';
+import { existsSync } from 'fs';
+import { join } from 'path';
 
-import {spawn} from 'child_process'
-import {readdir, mkdir} from 'fs/promises'
-import {join, basename, dirname} from 'path'
-import {fileURLToPath} from 'url'
+const projectRoot = process.cwd();
+const wasmProjectPath = join(projectRoot, 'roguelike-wasm');
+const outputPath = join(projectRoot, 'docs', 'wasm');
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const wasmExamplesDir = join(__dirname, '../src/wasm/examples')
-const wasmOutputDir = join(__dirname, '../dist/wasm')
+console.log('🎮 Building Roguelike WASM Module...\n');
 
-async function buildWasm() {
-  console.log('🔨 Building WASM game modules...')
-  
-  // Ensure output directory exists
-  await mkdir(wasmOutputDir, {recursive: true})
-  
-  // Find all TypeScript files in examples directory
-  const files = await readdir(wasmExamplesDir)
-  const tsFiles = files.filter(f => f.endsWith('.ts'))
-  
-  if (tsFiles.length === 0) {
-    console.log('No TypeScript files found in examples directory')
-    return
-  }
-  
-  // Build each TypeScript file
-  for (const file of tsFiles) {
-    const inputPath = join(wasmExamplesDir, file)
-    const outputName = basename(file, '.ts') + '.wasm'
-    const outputPath = join(wasmOutputDir, outputName)
-    
-    console.log(`  Building ${file} -> ${outputName}`)
-    
-    await new Promise((resolve, reject) => {
-      const asc = spawn('npx', [
-        'asc',
-        inputPath,
-        '-o', outputPath,
-        '--optimize',
-        '--noAssert',
-        '--runtime', 'minimal',
-        '--exportRuntime',
-        '--exportTable'
-      ])
-      
-      asc.stdout.on('data', data => {
-        console.log(`    ${data.toString().trim()}`)
-      })
-      
-      asc.stderr.on('data', data => {
-        console.error(`    ❌ ${data.toString().trim()}`)
-      })
-      
-      asc.on('close', code => {
-        if (code === 0) {
-          console.log(`    ✅ Successfully built ${outputName}`)
-          resolve()
-        } else {
-          reject(new Error(`Failed to build ${file}`))
-        }
-      })
-    }).catch(err => {
-      console.error(`    ⚠️  Failed to build ${file}: ${err.message}`)
-      console.log('    Make sure AssemblyScript is installed: npm install --save-dev assemblyscript')
-    })
-  }
-  
-  console.log('✨ WASM build complete!')
+// Check if Rust project exists
+if (!existsSync(wasmProjectPath)) {
+  console.error('❌ Rust project not found at:', wasmProjectPath);
+  process.exit(1);
 }
 
-// Run the build
-buildWasm().catch(console.error)
+try {
+  // Source cargo env and build
+  console.log('📦 Building with wasm-pack...');
+  execSync(
+    `source /usr/local/cargo/env 2>/dev/null || true && cd "${wasmProjectPath}" && wasm-pack build --target web --out-dir "${outputPath}"`,
+    { stdio: 'inherit', shell: '/bin/bash' }
+  );
+  
+  console.log('\n✅ WASM module built successfully!');
+  console.log(`📁 Output location: ${outputPath}`);
+  console.log('\n🚀 To run the game:');
+  console.log('   1. cd docs');
+  console.log('   2. python3 -m http.server 8080');
+  console.log('   3. Open http://localhost:8080 in your browser');
+  
+} catch (error) {
+  console.error('❌ Build failed:', error.message);
+  process.exit(1);
+}

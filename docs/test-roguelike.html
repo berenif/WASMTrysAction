@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Roguelike WASM Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        #status {
+            padding: 10px;
+            background: #333;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success { color: #4a7c59; }
+        .error { color: #ff6666; }
+        .info { color: #66ffff; }
+    </style>
+</head>
+<body>
+    <h1>Roguelike WASM Module Test</h1>
+    <div id="status">Loading...</div>
+    <div id="results"></div>
+
+    <script type="module">
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            resultsDiv.appendChild(div);
+        }
+        
+        async function testWASM() {
+            try {
+                log('Starting WASM module test...', 'info');
+                statusDiv.textContent = 'Importing WASM module...';
+                
+                const module = await import('./wasm/roguelike_wasm.js');
+                log('✓ WASM module imported successfully', 'success');
+                
+                statusDiv.textContent = 'Initializing WASM...';
+                await module.default();
+                log('✓ WASM initialized successfully', 'success');
+                
+                statusDiv.textContent = 'Creating game instance...';
+                const game = new module.Game();
+                log('✓ Game instance created', 'success');
+                
+                // Test game methods
+                const mapWidth = game.get_map_width();
+                const mapHeight = game.get_map_height();
+                log(`✓ Map dimensions: ${mapWidth}x${mapHeight}`, 'success');
+                
+                const player = game.get_player();
+                log(`✓ Player created at (${player.get_x()}, ${player.get_y()})`, 'success');
+                log(`✓ Player health: ${player.get_health()}/${player.get_max_health()}`, 'success');
+                
+                const score = game.get_score();
+                const floor = game.get_floor();
+                log(`✓ Initial game state - Score: ${score}, Floor: ${floor}`, 'success');
+                
+                // Test movement
+                statusDiv.textContent = 'Testing player movement...';
+                const moved = game.move_player(1, 0);
+                log(`✓ Player movement test: ${moved ? 'Success' : 'Blocked'}`, 'success');
+                
+                // Test tile access
+                const tile = game.get_tile(10, 10);
+                log(`✓ Tile access test - Tile at (10,10): ${tile}`, 'success');
+                
+                // Test visibility
+                const visible = game.is_visible(player.get_x(), player.get_y());
+                log(`✓ Visibility test - Player position visible: ${visible}`, 'success');
+                
+                // Test messages
+                const messages = game.get_messages();
+                log(`✓ Messages system - ${messages.length} message(s) in queue`, 'success');
+                if (messages.length > 0) {
+                    log(`  First message: "${messages[0]}"`, 'info');
+                }
+                
+                statusDiv.textContent = '✅ All tests passed!';
+                statusDiv.className = 'success';
+                
+                log('\n=== WASM Module Test Complete ===', 'success');
+                log('The roguelike game is ready to play!', 'success');
+                log('Open index.html to start playing.', 'info');
+                
+            } catch (error) {
+                statusDiv.textContent = '❌ Test failed!';
+                statusDiv.className = 'error';
+                log(`Error: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+        
+        // Run the test
+        testWASM();
+    </script>
+</body>
+</html>

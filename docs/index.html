@@ -2,74 +2,537 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes"
-    />
-    <meta name="author" content="Dan Motzenbecker" />
-    <meta
-      name="description"
-      content="Serverless WebRTC matchmaking for painless P2P"
-    />
-    <link href="images/favicon.png" rel="icon" type="image/png" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Mono:ital@0;1&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="site.css" />
-    <title>Trystero Playground - Multiplayer P2P Games</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    <meta name="author" content="Roguelike Game" />
+    <meta name="description" content="A WebAssembly-powered Roguelike Game" />
+    <title>Roguelike Game - WASM Edition</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: 'Courier New', monospace;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: #eee;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 20px;
+      }
+      
+      #game-container {
+        background: rgba(0, 0, 0, 0.8);
+        border: 2px solid #4a7c59;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        max-width: 1200px;
+        width: 100%;
+      }
+      
+      h1 {
+        text-align: center;
+        color: #4a7c59;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        font-size: 2.5em;
+      }
+      
+      #game-canvas {
+        display: block;
+        margin: 0 auto;
+        border: 2px solid #333;
+        background: #0a0a0a;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      
+      #game-info {
+        display: flex;
+        justify-content: space-around;
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 5px;
+      }
+      
+      .info-item {
+        text-align: center;
+      }
+      
+      .info-label {
+        color: #888;
+        font-size: 0.9em;
+        margin-bottom: 5px;
+      }
+      
+      .info-value {
+        color: #4a7c59;
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+      
+      #messages {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #333;
+        border-radius: 5px;
+        padding: 10px;
+        height: 120px;
+        overflow-y: auto;
+        margin: 20px 0;
+      }
+      
+      .message {
+        padding: 3px 0;
+        color: #aaa;
+        font-size: 0.9em;
+      }
+      
+      .message:last-child {
+        color: #fff;
+      }
+      
+      #controls {
+        text-align: center;
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 5px;
+      }
+      
+      .control-group {
+        margin: 10px 0;
+      }
+      
+      .key {
+        display: inline-block;
+        padding: 5px 10px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 3px;
+        margin: 0 5px;
+        font-weight: bold;
+      }
+      
+      #loading {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2em;
+        color: #4a7c59;
+        text-align: center;
+      }
+      
+      .health-bar {
+        width: 200px;
+        height: 20px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 10px auto;
+      }
+      
+      .health-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #ff3333 0%, #ff6666 100%);
+        transition: width 0.3s ease;
+      }
+      
+      #game-over {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #ff3333;
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+      }
+      
+      #game-over h2 {
+        color: #ff3333;
+        margin-bottom: 20px;
+      }
+      
+      #restart-btn {
+        padding: 10px 20px;
+        background: #4a7c59;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.2em;
+        margin-top: 10px;
+      }
+      
+      #restart-btn:hover {
+        background: #5a8c69;
+      }
+      
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 5px;
+      }
+      
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      
+      .legend-symbol {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 3px;
+        font-size: 1.2em;
+        font-weight: bold;
+      }
+    </style>
   </head>
   <body>
-    <div style="display: flex; justify-content: center; align-items: center; min-height: 500px; margin: 20px auto;">
-      <div id="canvas" style="width: 100%; max-width: 900px; height: 450px; border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); position: relative;"></div>
-      <canvas id="gameCanvas" width="800" height="400" style="display: none; border: 2px solid rgba(102,126,234,0.5); border-radius: 12px; background: linear-gradient(135deg, rgba(26,26,46,0.95) 0%, rgba(15,15,30,0.95) 100%); box-shadow: 0 20px 40px rgba(0,0,0,0.5);"></canvas>
+    <div id="loading">Loading WebAssembly Module...</div>
+    
+    <div id="game-container" style="display: none;">
+      <h1>⚔️ Roguelike Dungeon ⚔️</h1>
+      
+      <div id="game-info">
+        <div class="info-item">
+          <div class="info-label">Floor</div>
+          <div class="info-value" id="floor">1</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Score</div>
+          <div class="info-value" id="score">0</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Health</div>
+          <div class="health-bar">
+            <div class="health-fill" id="health-bar" style="width: 100%;"></div>
+          </div>
+          <div class="info-value" id="health">100/100</div>
+        </div>
+      </div>
+      
+      <canvas id="game-canvas"></canvas>
+      
+      <div id="messages"></div>
+      
+      <div id="controls">
+        <div class="control-group">
+          <strong>Movement:</strong>
+          <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span>
+          or
+          <span class="key">↑</span><span class="key">←</span><span class="key">↓</span><span class="key">→</span>
+        </div>
+        <div class="control-group">
+          <strong>Diagonal:</strong>
+          <span class="key">Q</span><span class="key">E</span><span class="key">Z</span><span class="key">C</span>
+          or Numpad
+        </div>
+      </div>
+      
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #4a7c59;">@</div>
+          <span>You</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #ff6666;">M</div>
+          <span>Monster</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #ffff66;">$</div>
+          <span>Gold</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #66ffff;">!</div>
+          <span>Potion</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #ffffff;">></div>
+          <span>Stairs</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #666666;">#</div>
+          <span>Wall</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #333333;">.</div>
+          <span>Floor</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #222222;">?</div>
+          <span>Unexplored</span>
+        </div>
+      </div>
     </div>
-    <header style="padding: 20px 0;">
-      <h1>🎮 Trystero Playground</h1>
-      <div style="display: flex; justify-content: center; gap: 20px; align-items: center;">
-        <div id="room-num" style="font-size: 18px;"></div>
-        <div id="peer-count" style="font-size: 18px;">Players: 1</div>
-        <a href="https://github.com/dmotz/trystero" style="font-size: 14px;">GitHub</a>
-      </div>
-    </header>
-
-    <main style="padding-top: 20px;">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div id="game-mode-toggle" style="margin-bottom: 15px;">
-          <button id="toggle-game-btn" style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 18px; font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
-            🎮 Switch to Game Mode
-          </button>
-        </div>
-        <p style="font-size: 14px; opacity: 0.8; margin: 10px 0;">
-          <strong>Controls:</strong> Mouse/Touch or WASD/Arrow Keys + Space
-        </p>
-      </div>
-
-      <div id="game-info" style="display: none; margin: 20px auto; padding: 10px 20px; background: rgba(0,0,0,0.5); border-radius: 8px; max-width: 600px; backdrop-filter: blur(10px);">
-        <div style="display: flex; justify-content: space-around; align-items: center;">
-          <span style="color: #ffd700; font-size: 16px;">👥 Players: <span id="game-players">1</span></span>
-          <span style="color: #ffd700; font-size: 16px;">🏆 Score: <span id="game-score">0</span></span>
-          <span style="color: #ffd700; font-size: 16px;">⚡ FPS: <span id="game-fps">0</span></span>
-        </div>
-      </div>
-
-      <div id="peer-info" style="text-align: center; margin: 15px 0; font-size: 14px; opacity: 0.7;">
-        Waiting for other players to join...
-      </div>
-
-      <details style="margin: 40px auto 20px; max-width: 600px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
-        <summary style="cursor: pointer; font-weight: bold; font-size: 16px;">📚 Quick Start Guide</summary>
-        <div style="margin-top: 15px; font-size: 14px; line-height: 1.6;">
-          <p><strong>Cursor Mode:</strong> Move your mouse or use WASD/Arrow keys. Click or press Space to drop fruits.</p>
-          <p><strong>Game Mode:</strong> Navigate obstacles, collect coins, and compete with other players!</p>
-          <p style="margin-top: 10px;">Open this page in another tab to test multiplayer locally.</p>
-          <p style="margin-top: 10px;">
-            <a href="https://github.com/dmotz/trystero#readme" style="color: #667eea;">View full documentation →</a>
-          </p>
-        </div>
-      </details>
-    </main>
-    <script src="site.js" type="module"></script>
+    
+    <div id="game-over">
+      <h2>Game Over!</h2>
+      <p>Final Score: <span id="final-score">0</span></p>
+      <p>Floor Reached: <span id="final-floor">1</span></p>
+      <button id="restart-btn">Play Again</button>
+    </div>
+    
+    <script type="module">
+      import init, { Game, TileType, EntityType } from './wasm/roguelike_wasm.js';
+      
+      let game = null;
+      let canvas = null;
+      let ctx = null;
+      const TILE_SIZE = 20;
+      
+      // Color scheme
+      const COLORS = {
+        wall: '#666666',
+        wallDark: '#333333',
+        floor: '#2a2a2a',
+        floorDark: '#1a1a1a',
+        stairs: '#ffffff',
+        player: '#4a7c59',
+        monster: '#ff6666',
+        gold: '#ffff66',
+        potion: '#66ffff',
+        unexplored: '#0a0a0a',
+        fog: 'rgba(0, 0, 0, 0.5)'
+      };
+      
+      async function initGame() {
+        try {
+          await init();
+          
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('game-container').style.display = 'block';
+          
+          canvas = document.getElementById('game-canvas');
+          ctx = canvas.getContext('2d');
+          
+          startNewGame();
+          
+          // Set up event listeners
+          document.addEventListener('keydown', handleKeyPress);
+          document.getElementById('restart-btn').addEventListener('click', () => {
+            document.getElementById('game-over').style.display = 'none';
+            startNewGame();
+          });
+          
+        } catch (error) {
+          console.error('Failed to initialize WASM:', error);
+          document.getElementById('loading').textContent = 'Failed to load game. Please refresh the page.';
+        }
+      }
+      
+      function startNewGame() {
+        game = new Game();
+        
+        const mapWidth = game.get_map_width();
+        const mapHeight = game.get_map_height();
+        
+        canvas.width = mapWidth * TILE_SIZE;
+        canvas.height = mapHeight * TILE_SIZE;
+        
+        render();
+        updateUI();
+      }
+      
+      function handleKeyPress(event) {
+        if (!game || game.is_game_over()) return;
+        
+        let dx = 0, dy = 0;
+        
+        switch(event.key.toLowerCase()) {
+          case 'w':
+          case 'arrowup':
+            dy = -1;
+            break;
+          case 's':
+          case 'arrowdown':
+            dy = 1;
+            break;
+          case 'a':
+          case 'arrowleft':
+            dx = -1;
+            break;
+          case 'd':
+          case 'arrowright':
+            dx = 1;
+            break;
+          case 'q':
+            dx = -1; dy = -1;
+            break;
+          case 'e':
+            dx = 1; dy = -1;
+            break;
+          case 'z':
+            dx = -1; dy = 1;
+            break;
+          case 'c':
+            dx = 1; dy = 1;
+            break;
+          default:
+            return;
+        }
+        
+        event.preventDefault();
+        
+        if (dx !== 0 || dy !== 0) {
+          game.move_player(dx, dy);
+          render();
+          updateUI();
+          
+          if (game.is_game_over()) {
+            showGameOver();
+          }
+        }
+      }
+      
+      function render() {
+        if (!game || !ctx) return;
+        
+        const mapWidth = game.get_map_width();
+        const mapHeight = game.get_map_height();
+        
+        // Clear canvas
+        ctx.fillStyle = COLORS.unexplored;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw map
+        for (let y = 0; y < mapHeight; y++) {
+          for (let x = 0; x < mapWidth; x++) {
+            const isVisible = game.is_visible(x, y);
+            const isExplored = game.is_explored(x, y);
+            
+            if (!isExplored) continue;
+            
+            const tile = game.get_tile(x, y);
+            let color = COLORS.unexplored;
+            let symbol = '';
+            
+            // Determine tile appearance
+            if (tile === TileType.Wall) {
+              color = isVisible ? COLORS.wall : COLORS.wallDark;
+              symbol = '#';
+            } else if (tile === TileType.Floor) {
+              color = isVisible ? COLORS.floor : COLORS.floorDark;
+              symbol = '.';
+            } else if (tile === TileType.StairsDown) {
+              color = isVisible ? COLORS.stairs : COLORS.wallDark;
+              symbol = '>';
+            }
+            
+            // Draw tile background
+            ctx.fillStyle = color;
+            ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            
+            // Draw tile symbol
+            if (symbol && isVisible) {
+              ctx.fillStyle = tile === TileType.Wall ? '#444' : '#555';
+              ctx.font = `${TILE_SIZE * 0.8}px monospace`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(symbol, x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2);
+            }
+            
+            // Apply fog of war
+            if (!isVisible && isExplored) {
+              ctx.fillStyle = COLORS.fog;
+              ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+          }
+        }
+        
+        // Draw entities
+        for (let y = 0; y < mapHeight; y++) {
+          for (let x = 0; x < mapWidth; x++) {
+            if (!game.is_visible(x, y)) continue;
+            
+            const entities = game.get_entities_at(x, y);
+            if (entities.length > 0) {
+              const entity = entities[0];
+              let color = COLORS.player;
+              let symbol = entity.get_symbol();
+              
+              switch(entity.get_type()) {
+                case EntityType.Player:
+                  color = COLORS.player;
+                  break;
+                case EntityType.Monster:
+                  color = COLORS.monster;
+                  break;
+                case EntityType.Gold:
+                  color = COLORS.gold;
+                  break;
+                case EntityType.Potion:
+                  color = COLORS.potion;
+                  break;
+              }
+              
+              // Draw entity
+              ctx.fillStyle = color;
+              ctx.font = `bold ${TILE_SIZE * 0.9}px monospace`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(symbol, x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2);
+            }
+          }
+        }
+      }
+      
+      function updateUI() {
+        if (!game) return;
+        
+        const player = game.get_player();
+        const health = player.get_health();
+        const maxHealth = player.get_max_health();
+        const healthPercent = Math.max(0, (health / maxHealth) * 100);
+        
+        document.getElementById('floor').textContent = game.get_floor();
+        document.getElementById('score').textContent = game.get_score();
+        document.getElementById('health').textContent = `${Math.max(0, health)}/${maxHealth}`;
+        document.getElementById('health-bar').style.width = `${healthPercent}%`;
+        
+        // Update messages
+        const messagesDiv = document.getElementById('messages');
+        const messages = game.get_messages();
+        messagesDiv.innerHTML = '';
+        
+        for (const msg of messages) {
+          const msgDiv = document.createElement('div');
+          msgDiv.className = 'message';
+          msgDiv.textContent = msg;
+          messagesDiv.appendChild(msgDiv);
+        }
+        
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+      
+      function showGameOver() {
+        document.getElementById('final-score').textContent = game.get_score();
+        document.getElementById('final-floor').textContent = game.get_floor();
+        document.getElementById('game-over').style.display = 'block';
+      }
+      
+      // Initialize the game when the page loads
+      initGame();
+    </script>
   </body>
 </html>
