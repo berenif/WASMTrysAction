@@ -14,7 +14,12 @@ const config = {
   },
   plugins: [
     resolve({browser: true, preferBuiltins: false}),
-    commonJs(),
+    commonJs({
+      ignoreGlobal: false,
+      include: /node_modules/,
+      // Handle 'this' in top-level scope correctly for Supabase and other CommonJS modules
+      requireReturnsDefault: 'auto'
+    }),
     replace({
       'process.env.NODE_ENV': nodeEnv,
       'process?.env?.NODE_ENV': nodeEnv,
