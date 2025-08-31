@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    <meta name="author" content="Roguelike Game - Multiplayer" />
+    <meta name="description" content="A WebAssembly-powered Multiplayer Roguelike Game" />
+    <title>Multiplayer Roguelike - P2P Edition</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: 'Courier New', monospace;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: #eee;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 20px;
+      }
+      
+      #game-container {
+        background: rgba(0, 0, 0, 0.8);
+        border: 2px solid #4a7c59;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        max-width: 1200px;
+        width: 100%;
+      }
+      
+      h1 {
+        text-align: center;
+        color: #4a7c59;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        font-size: 2.5em;
+      }
+      
+      #game-canvas {
+        display: block;
+        margin: 0 auto;
+        border: 2px solid #333;
+        background: #0a0a0a;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      
+      #room-controls {
+        display: flex;
+        gap: 10px;
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 5px;
+        justify-content: center;
+        align-items: center;
+      }
+      
+      #room-controls input {
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid #4a7c59;
+        border-radius: 4px;
+        color: #eee;
+        font-family: inherit;
+      }
+      
+      #room-controls button {
+        padding: 8px 16px;
+        background: #4a7c59;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: inherit;
+        font-weight: bold;
+        transition: background 0.3s;
+      }
+      
+      #room-controls button:hover:not(:disabled) {
+        background: #5a8c69;
+      }
+      
+      #room-controls button:disabled {
+        background: #333;
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      
+      #connection-status {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.9em;
+        margin-left: 10px;
+      }
+      
+      .status-connected {
+        background: #4a7c59;
+        color: white;
+      }
+      
+      .status-disconnected {
+        background: #666;
+        color: white;
+      }
+      
+      .status-connecting {
+        background: #ff9800;
+        color: white;
+      }
+      
+      #game-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 5px;
+      }
+      
+      .info-item {
+        text-align: center;
+      }
+      
+      .info-label {
+        color: #888;
+        font-size: 0.9em;
+        margin-bottom: 5px;
+      }
+      
+      .info-value {
+        color: #4a7c59;
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+      
+      .health-bar {
+        width: 100%;
+        height: 20px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 5px 0;
+      }
+      
+      .health-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4a7c59, #6a9c79);
+        transition: width 0.3s ease;
+      }
+      
+      #messages {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #333;
+        border-radius: 5px;
+        padding: 10px;
+        height: 120px;
+        overflow-y: auto;
+        margin: 20px 0;
+      }
+      
+      .message {
+        padding: 3px 0;
+        color: #aaa;
+        font-size: 0.9em;
+      }
+      
+      .message:last-child {
+        color: #fff;
+      }
+      
+      #players-list {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #333;
+        border-radius: 5px;
+        padding: 10px;
+        margin: 20px 0;
+      }
+      
+      #players-list h3 {
+        color: #4a7c59;
+        margin-bottom: 10px;
+        font-size: 1.2em;
+      }
+      
+      .player-item {
+        padding: 5px;
+        margin: 5px 0;
+        background: rgba(74, 124, 89, 0.2);
+        border-radius: 3px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .player-name {
+        font-weight: bold;
+      }
+      
+      .player-stats {
+        font-size: 0.9em;
+        color: #aaa;
+      }
+      
+      .player-color {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 10px;
+        vertical-align: middle;
+      }
+      
+      #controls {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 5px;
+        flex-wrap: wrap;
+      }
+      
+      .control-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      
+      .key {
+        display: inline-block;
+        padding: 4px 8px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 0.9em;
+        margin: 0 2px;
+      }
+      
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 5px;
+      }
+      
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      
+      .legend-symbol {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 3px;
+        font-size: 1.2em;
+        font-weight: bold;
+      }
+      
+      #loading {
+        text-align: center;
+        font-size: 1.5em;
+        color: #4a7c59;
+        padding: 50px;
+      }
+      
+      #game-over {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #ff3333;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        z-index: 1000;
+      }
+      
+      #game-over h2 {
+        color: #ff3333;
+        margin-bottom: 20px;
+      }
+      
+      #game-over button {
+        padding: 10px 20px;
+        background: #4a7c59;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.1em;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading">Loading Multiplayer Roguelike...</div>
+    
+    <div id="game-container" style="display: none;">
+      <h1>⚔️ Multiplayer Roguelike Dungeon ⚔️</h1>
+      
+      <div id="room-controls">
+        <input type="text" id="room-input" placeholder="Enter Room ID" />
+        <button id="create-room-btn">Create Room</button>
+        <button id="join-room-btn">Join Room</button>
+        <button id="leave-room-btn" disabled>Leave Room</button>
+        <span id="connection-status" class="status-disconnected">Disconnected</span>
+      </div>
+      
+      <div id="game-info">
+        <div class="info-item">
+          <div class="info-label">Room ID</div>
+          <div class="info-value" id="room-id">-</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Players</div>
+          <div class="info-value" id="player-count">0</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Floor</div>
+          <div class="info-value" id="floor">1</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Your Score</div>
+          <div class="info-value" id="score">0</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Health</div>
+          <div class="health-bar">
+            <div class="health-fill" id="health-bar" style="width: 100%;"></div>
+          </div>
+          <div class="info-value" id="health">100/100</div>
+        </div>
+      </div>
+      
+      <canvas id="game-canvas" width="800" height="600"></canvas>
+      
+      <div id="players-list">
+        <h3>Players in Dungeon</h3>
+        <div id="players-container">
+          <div style="color: #666;">No players connected</div>
+        </div>
+      </div>
+      
+      <div id="messages"></div>
+      
+      <div id="controls">
+        <div class="control-group">
+          <strong>Movement:</strong>
+          <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span>
+          or
+          <span class="key">↑</span><span class="key">←</span><span class="key">↓</span><span class="key">→</span>
+        </div>
+        <div class="control-group">
+          <strong>Diagonal:</strong>
+          <span class="key">Q</span><span class="key">E</span><span class="key">Z</span><span class="key">C</span>
+        </div>
+        <div class="control-group">
+          <strong>Jump:</strong>
+          <span class="key">Space</span>
+        </div>
+      </div>
+      
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #4a7c59;">@</div>
+          <span>Players</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #ff6666;">M</div>
+          <span>Monster</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #ffff66;">$</div>
+          <span>Gold</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #66ffff;">!</div>
+          <span>Potion</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #ffffff;">></div>
+          <span>Stairs</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #666666;">#</div>
+          <span>Wall</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol" style="color: #8B4513;">█</div>
+          <span>Obstacle</span>
+        </div>
+      </div>
+    </div>
+    
+    <div id="game-over">
+      <h2>Game Over!</h2>
+      <p>Final Score: <span id="final-score">0</span></p>
+      <p>Floor Reached: <span id="final-floor">1</span></p>
+      <button id="restart-btn">Play Again</button>
+    </div>
+    
+    <script type="module">
+      import {joinRoom} from 'https://unpkg.com/trystero@latest/nostr.js'
+      
+      // Game state
+      let room = null;
+      let gameState = {
+        players: new Map(),
+        map: null,
+        obstacles: [],
+        entities: [],
+        floor: 1,
+        seed: null
+      };
+      let myPlayerId = null;
+      let isHost = false;
+      let canvas = null;
+      let ctx = null;
+      const TILE_SIZE = 20;
+      
+      // Action channels
+      let sendAction, getAction;
+      let sendState, getState;
+      let sendJoinGame, getJoinGame;
+      
+      // Color scheme
+      const COLORS = {
+        wall: '#666666',
+        wallDark: '#333333',
+        floor: '#2a2a2a',
+        floorDark: '#1a1a1a',
+        obstacle: '#8B4513',
+        stairs: '#ffffff',
+        player: '#4a7c59',
+        monster: '#ff6666',
+        gold: '#ffff66',
+        potion: '#66ffff',
+        unexplored: '#0a0a0a',
+        fog: 'rgba(0, 0, 0, 0.5)'
+      };
+      
+      // Player colors for multiplayer
+      const PLAYER_COLORS = [
+        '#4a7c59', '#7c4a59', '#597c4a', '#4a597c',
+        '#7c594a', '#4a7c7c', '#7c7c4a', '#594a7c'
+      ];
+      
+      function initGame() {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        
+        canvas = document.getElementById('game-canvas');
+        ctx = canvas.getContext('2d');
+        
+        // Set up room controls
+        document.getElementById('create-room-btn').addEventListener('click', createRoom);
+        document.getElementById('join-room-btn').addEventListener('click', joinRoomHandler);
+        document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
+        document.getElementById('restart-btn').addEventListener('click', restartGame);
+        
+        // Set up keyboard controls
+        document.addEventListener('keydown', handleKeyPress);
+        
+        // Generate a default room ID
+        document.getElementById('room-input').value = 'dungeon-' + Math.random().toString(36).substr(2, 6);
+      }
+      
+      function createRoom() {
+        const roomId = document.getElementById('room-input').value || 'default-room';
+        joinOrCreateRoom(roomId, true);
+      }
+      
+      function joinRoomHandler() {
+        const roomId = document.getElementById('room-input').value || 'default-room';
+        joinOrCreateRoom(roomId, false);
+      }
+      
+      function joinOrCreateRoom(roomId, isCreating) {
+        if (room) {
+          leaveRoom();
+        }
+        
+        // Update UI
+        document.getElementById('room-id').textContent = roomId;
+        document.getElementById('connection-status').className = 'status-connecting';
+        document.getElementById('connection-status').textContent = 'Connecting...';
+        
+        // Join Trystero room
+        room = joinRoom({appId: 'multiplayer-roguelike'}, roomId);
+        
+        // Generate player ID
+        myPlayerId = room.selfId || 'player-' + Math.random().toString(36).substr(2, 9);
+        
+        // Set up action channels
+        [sendAction, getAction] = room.makeAction('gameAction');
+        [sendState, getState] = room.makeAction('gameState');
+        [sendJoinGame, getJoinGame] = room.makeAction('joinGame');
+        
+        // Handle peer events
+        room.onPeerJoin(peerId => {
+          console.log('Peer joined:', peerId);
+          
+          if (isHost) {
+            // Send current game state to new player
+            sendFullGameState();
+          }
+          
+          updatePlayerCount();
+        });
+        
+        room.onPeerLeave(peerId => {
+          console.log('Peer left:', peerId);
+          gameState.players.delete(peerId);
+          updatePlayerCount();
+          render();
+        });
+        
+        // Handle game actions
+        getAction((data, peerId) => {
+          handlePlayerAction(peerId, data);
+        });
+        
+        // Handle game state updates
+        getState((state, peerId) => {
+          if (!isHost) {
+            // Receive full game state from host
+            gameState = state;
+            render();
+            updateUI();
+          }
+        });
+        
+        // Handle join requests
+        getJoinGame((data, peerId) => {
+          if (isHost) {
+            // Add new player to game
+            addPlayer(peerId, data);
+            sendFullGameState();
+          }
+        });
+        
+        // Initialize game
+        if (isCreating) {
+          isHost = true;
+          initializeGameWorld(roomId);
+        } else {
+          // Request to join existing game
+          setTimeout(() => {
+            sendJoinGame({
+              playerId: myPlayerId,
+              name: 'Player ' + myPlayerId.substr(0, 4)
+            });
+          }, 500);
+        }
+        
+        // Add self as player
+        addPlayer(myPlayerId, {
+          name: 'You',
+          isLocal: true
+        });
+        
+        // Update UI
+        document.getElementById('create-room-btn').disabled = true;
+        document.getElementById('join-room-btn').disabled = true;
+        document.getElementById('leave-room-btn').disabled = false;
+        document.getElementById('connection-status').className = 'status-connected';
+        document.getElementById('connection-status').textContent = 'Connected';
+        
+        updatePlayerCount();
+        render();
+      }
+      
+      function leaveRoom() {
+        if (room) {
+          room.leave();
+          room = null;
+          gameState.players.clear();
+          isHost = false;
+          myPlayerId = null;
+        }
+        
+        // Update UI
+        document.getElementById('create-room-btn').disabled = false;
+        document.getElementById('join-room-btn').disabled = false;
+        document.getElementById('leave-room-btn').disabled = true;
+        document.getElementById('connection-status').className = 'status-disconnected';
+        document.getElementById('connection-status').textContent = 'Disconnected';
+        document.getElementById('room-id').textContent = '-';
+        document.getElementById('player-count').textContent = '0';
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      
+      function initializeGameWorld(roomId) {
+        // Use room ID as seed for consistent map generation
+        gameState.seed = roomId;
+        
+        // Generate consistent map based on seed
+        gameState.map = generateDungeonMap(40, 30, gameState.seed);
+        
+        // Generate consistent obstacles
+        gameState.obstacles = generateObstacles(gameState.seed);
+        
+        // Initialize entities
+        gameState.entities = [];
+        gameState.floor = 1;
+        
+        render();
+      }
+      
+      function generateDungeonMap(width, height, seed) {
+        // Simple seeded random number generator
+        let rng = seedRandom(seed);
+        
+        // Create map array
+        const map = [];
+        for (let y = 0; y < height; y++) {
+          map[y] = [];
+          for (let x = 0; x < width; x++) {
+            // Create walls around edges
+            if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
+              map[y][x] = '#';
+            } else {
+              map[y][x] = '.';
+            }
+          }
+        }
+        
+        // Add some random walls/obstacles based on seed
+        for (let i = 0; i < 20; i++) {
+          const x = Math.floor(rng() * (width - 4)) + 2;
+          const y = Math.floor(rng() * (height - 4)) + 2;
+          const w = Math.floor(rng() * 3) + 2;
+          const h = Math.floor(rng() * 3) + 2;
+          
+          for (let dy = 0; dy < h; dy++) {
+            for (let dx = 0; dx < w; dx++) {
+              if (x + dx < width - 1 && y + dy < height - 1) {
+                map[y + dy][x + dx] = '#';
+              }
+            }
+          }
+        }
+        
+        // Create some open areas
+        for (let i = 0; i < 5; i++) {
+          const x = Math.floor(rng() * (width - 6)) + 3;
+          const y = Math.floor(rng() * (height - 6)) + 3;
+          const radius = Math.floor(rng() * 2) + 2;
+          
+          for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+              if (dx * dx + dy * dy <= radius * radius) {
+                if (x + dx > 0 && x + dx < width - 1 && 
+                    y + dy > 0 && y + dy < height - 1) {
+                  map[y + dy][x + dx] = '.';
+                }
+              }
+            }
+          }
+        }
+        
+        return map;
+      }
+      
+      function generateObstacles(seed) {
+        let rng = seedRandom(seed);
+        const obstacles = [];
+        
+        // Add consistent obstacles based on seed
+        obstacles.push({
+          x: 15,
+          y: 10,
+          width: 3,
+          height: 5,
+          type: 'pillar'
+        });
+        
+        obstacles.push({
+          x: 25,
+          y: 15,
+          width: 2,
+          height: 3,
+          type: 'rock'
+        });
+        
+        // Add more random obstacles
+        for (let i = 0; i < 5; i++) {
+          obstacles.push({
+            x: Math.floor(rng() * 30) + 5,
+            y: Math.floor(rng() * 20) + 5,
+            width: Math.floor(rng() * 2) + 1,
+            height: Math.floor(rng() * 2) + 1,
+            type: rng() > 0.5 ? 'rock' : 'pillar'
+          });
+        }
+        
+        return obstacles;
+      }
+      
+      function seedRandom(seed) {
+        let hash = 0;
+        for (let i = 0; i < seed.length; i++) {
+          hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+          hash = hash & hash;
+        }
+        
+        return function() {
+          hash = (hash * 1103515245 + 12345) & 0x7fffffff;
+          return hash / 0x7fffffff;
+        };
+      }
+      
+      function addPlayer(playerId, data = {}) {
+        if (!gameState.players.has(playerId)) {
+          // Find a safe spawn position
+          const spawnPos = findSafeSpawnPosition();
+          
+          gameState.players.set(playerId, {
+            id: playerId,
+            name: data.name || 'Player',
+            x: spawnPos.x,
+            y: spawnPos.y,
+            health: 100,
+            maxHealth: 100,
+            score: 0,
+            color: PLAYER_COLORS[gameState.players.size % PLAYER_COLORS.length],
+            isLocal: data.isLocal || false
+          });
+          
+          updatePlayersList();
+        }
+      }
+      
+      function findSafeSpawnPosition() {
+        // Find a safe position away from walls and obstacles
+        const map = gameState.map;
+        if (!map) return {x: 5, y: 5};
+        
+        const candidates = [];
+        
+        for (let y = 1; y < map.length - 1; y++) {
+          for (let x = 1; x < map[y].length - 1; x++) {
+            if (map[y][x] === '.') {
+              // Check if position is safe (not near obstacles)
+              let safe = true;
+              for (const obstacle of gameState.obstacles) {
+                if (x >= obstacle.x && x < obstacle.x + obstacle.width &&
+                    y >= obstacle.y && y < obstacle.y + obstacle.height) {
+                  safe = false;
+                  break;
+                }
+              }
+              
+              if (safe) {
+                candidates.push({x, y});
+              }
+            }
+          }
+        }
+        
+        // Return a random safe position
+        if (candidates.length > 0) {
+          return candidates[Math.floor(Math.random() * candidates.length)];
+        }
+        
+        return {x: 5, y: 5}; // Fallback
+      }
+      
+      function handleKeyPress(event) {
+        if (!room || !myPlayerId) return;
+        
+        const player = gameState.players.get(myPlayerId);
+        if (!player) return;
+        
+        let dx = 0, dy = 0;
+        let action = null;
+        
+        switch(event.key.toLowerCase()) {
+          case 'w':
+          case 'arrowup':
+            dy = -1;
+            action = 'move';
+            break;
+          case 's':
+          case 'arrowdown':
+            dy = 1;
+            action = 'move';
+            break;
+          case 'a':
+          case 'arrowleft':
+            dx = -1;
+            action = 'move';
+            break;
+          case 'd':
+          case 'arrowright':
+            dx = 1;
+            action = 'move';
+            break;
+          case 'q':
+            dx = -1; dy = -1;
+            action = 'move';
+            break;
+          case 'e':
+            dx = 1; dy = -1;
+            action = 'move';
+            break;
+          case 'z':
+            dx = -1; dy = 1;
+            action = 'move';
+            break;
+          case 'c':
+            dx = 1; dy = 1;
+            action = 'move';
+            break;
+          case ' ':
+            action = 'jump';
+            break;
+          default:
+            return;
+        }
+        
+        event.preventDefault();
+        
+        if (action) {
+          // Apply action locally for immediate feedback
+          if (action === 'move' && (dx !== 0 || dy !== 0)) {
+            movePlayer(myPlayerId, dx, dy);
+          }
+          
+          // Send action to other players
+          if (sendAction) {
+            sendAction({
+              type: action,
+              dx: dx,
+              dy: dy,
+              playerId: myPlayerId
+            });
+          }
+          
+          render();
+          updateUI();
+        }
+      }
+      
+      function movePlayer(playerId, dx, dy) {
+        const player = gameState.players.get(playerId);
+        if (!player) return;
+        
+        const newX = player.x + dx;
+        const newY = player.y + dy;
+        
+        // Check map bounds
+        if (!gameState.map || newY < 0 || newY >= gameState.map.length ||
+            newX < 0 || newX >= gameState.map[0].length) {
+          return;
+        }
+        
+        // Check wall collision
+        if (gameState.map[newY][newX] === '#') {
+          return;
+        }
+        
+        // Check obstacle collision
+        for (const obstacle of gameState.obstacles) {
+          if (newX >= obstacle.x && newX < obstacle.x + obstacle.width &&
+              newY >= obstacle.y && newY < obstacle.y + obstacle.height) {
+            return;
+          }
+        }
+        
+        // Move player
+        player.x = newX;
+        player.y = newY;
+      }
+      
+      function handlePlayerAction(peerId, action) {
+        if (action.type === 'move') {
+          movePlayer(peerId, action.dx, action.dy);
+        }
+        
+        render();
+      }
+      
+      function sendFullGameState() {
+        if (sendState) {
+          sendState({
+            players: Array.from(gameState.players.entries()),
+            map: gameState.map,
+            obstacles: gameState.obstacles,
+            entities: gameState.entities,
+            floor: gameState.floor,
+            seed: gameState.seed
+          });
+        }
+      }
+      
+      function render() {
+        if (!ctx || !gameState.map) return;
+        
+        const map = gameState.map;
+        const mapHeight = map.length;
+        const mapWidth = map[0].length;
+        
+        // Set canvas size
+        canvas.width = mapWidth * TILE_SIZE;
+        canvas.height = mapHeight * TILE_SIZE;
+        
+        // Clear canvas
+        ctx.fillStyle = COLORS.unexplored;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw map
+        for (let y = 0; y < mapHeight; y++) {
+          for (let x = 0; x < mapWidth; x++) {
+            const tile = map[y][x];
+            let color = COLORS.floor;
+            
+            if (tile === '#') {
+              color = COLORS.wall;
+            } else if (tile === '.') {
+              color = COLORS.floor;
+            }
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            
+            // Draw grid lines for clarity
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          }
+        }
+        
+        // Draw obstacles
+        for (const obstacle of gameState.obstacles) {
+          ctx.fillStyle = COLORS.obstacle;
+          ctx.fillRect(
+            obstacle.x * TILE_SIZE,
+            obstacle.y * TILE_SIZE,
+            obstacle.width * TILE_SIZE,
+            obstacle.height * TILE_SIZE
+          );
+          
+          // Add border
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(
+            obstacle.x * TILE_SIZE,
+            obstacle.y * TILE_SIZE,
+            obstacle.width * TILE_SIZE,
+            obstacle.height * TILE_SIZE
+          );
+        }
+        
+        // Draw players
+        for (const [playerId, player] of gameState.players) {
+          ctx.fillStyle = player.color;
+          ctx.font = `bold ${TILE_SIZE * 0.9}px monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(
+            '@',
+            player.x * TILE_SIZE + TILE_SIZE / 2,
+            player.y * TILE_SIZE + TILE_SIZE / 2
+          );
+          
+          // Draw player name
+          ctx.fillStyle = 'white';
+          ctx.font = '10px sans-serif';
+          ctx.fillText(
+            player.name,
+            player.x * TILE_SIZE + TILE_SIZE / 2,
+            player.y * TILE_SIZE - 5
+          );
+        }
+      }
+      
+      function updateUI() {
+        const player = gameState.players.get(myPlayerId);
+        if (!player) return;
+        
+        document.getElementById('score').textContent = player.score;
+        document.getElementById('health').textContent = `${player.health}/${player.maxHealth}`;
+        document.getElementById('health-bar').style.width = `${(player.health / player.maxHealth) * 100}%`;
+        document.getElementById('floor').textContent = gameState.floor;
+      }
+      
+      function updatePlayerCount() {
+        const count = room ? gameState.players.size : 0;
+        document.getElementById('player-count').textContent = count;
+      }
+      
+      function updatePlayersList() {
+        const container = document.getElementById('players-container');
+        container.innerHTML = '';
+        
+        if (gameState.players.size === 0) {
+          container.innerHTML = '<div style="color: #666;">No players connected</div>';
+          return;
+        }
+        
+        for (const [playerId, player] of gameState.players) {
+          const playerDiv = document.createElement('div');
+          playerDiv.className = 'player-item';
+          playerDiv.innerHTML = `
+            <div>
+              <span class="player-color" style="background: ${player.color};"></span>
+              <span class="player-name">${player.name}</span>
+              ${player.isLocal ? ' (You)' : ''}
+            </div>
+            <div class="player-stats">
+              HP: ${player.health}/${player.maxHealth} | Score: ${player.score}
+            </div>
+          `;
+          container.appendChild(playerDiv);
+        }
+      }
+      
+      function restartGame() {
+        document.getElementById('game-over').style.display = 'none';
+        if (isHost) {
+          initializeGameWorld(gameState.seed);
+          sendFullGameState();
+        }
+      }
+      
+      function showGameOver() {
+        const player = gameState.players.get(myPlayerId);
+        if (!player) return;
+        
+        document.getElementById('final-score').textContent = player.score;
+        document.getElementById('final-floor').textContent = gameState.floor;
+        document.getElementById('game-over').style.display = 'block';
+      }
+      
+      // Initialize the game when the page loads
+      initGame();
+    </script>
+  </body>
+</html>
