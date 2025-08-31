@@ -1,0 +1,163 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+.env
+venv.bak/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# IDE and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.pydevproject
+.settings/
+.classpath
+*.sublime-project
+*.sublime-workspace
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Game Specific
+savegame.dat
+*.save
+*.sav
+saves/
+logs/
+screenshots/
+replays/
+user_data/
+config.ini
+settings.json
+highscores.dat
+
+# Pygame specific
+*.pyc
+pygame_cache/
+
+# Documentation
+docs/_build/
+docs/.doctrees/
+*.rst~
+
+# Debugging
+*.log
+*.stackdump
+core.*
+.gdb_history
+
+# Profiling
+*.prof
+*.lprof
+.profile
+*.stats
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+.cache/
+tmp/
+temp/
+
+# Package files
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Security (never commit these!)
+*.key
+*.pem
+*.crt
+*.p12
+.secrets/
+credentials.json
+auth.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/

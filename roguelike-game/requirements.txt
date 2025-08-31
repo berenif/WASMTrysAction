@@ -1,0 +1,6 @@
+pygame==2.5.2
+numpy==1.24.3
+pyyaml==6.0.1
+pytest==7.4.3
+black==23.11.0
+pylint==3.0.3
