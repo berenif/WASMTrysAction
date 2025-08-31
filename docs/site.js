@@ -3,7 +3,7 @@ import {joinRoom, selfId} from './trystero-torrent.min.js'
 const byId = document.getElementById.bind(document)
 const canvas = byId('canvas')
 const peerInfo = byId('peer-info')
-const noPeersCopy = peerInfo.innerText
+const noPeersCopy = 'Waiting for other players to join...'
 const config = {appId: 'trystero-demo1'}
 const cursors = {}
 const knightFrames = [
@@ -166,11 +166,26 @@ function removeCursor(id) {
 
 function updatePeerInfo() {
   const count = Object.keys(room.getPeers()).length
+  const totalPlayers = count + 1 // Include self
+  
+  // Update player count display
+  const playerCountEl = byId('peer-count')
+  if (playerCountEl) {
+    playerCountEl.innerHTML = `🎮 Players: ${totalPlayers}`
+  }
+  
+  // Update peer info message
   peerInfo.innerHTML = count
-    ? `Right now <em>${count}</em> other peer${
-        count === 1 ? ' is' : 's are'
-      } connected with you. Click to send them some fruit.`
-    : noPeersCopy
+    ? `<span style="color: #4ade80;">✓ Connected</span> - ${count} other player${count === 1 ? '' : 's'} in room`
+    : `<span style="opacity: 0.6;">Waiting for other players to join...</span>`
+  
+  // Update game mode player count if active
+  if (gameMode) {
+    const gamePlayersEl = byId('game-players')
+    if (gamePlayersEl) {
+      gamePlayersEl.textContent = totalPlayers
+    }
+  }
 }
 
 function dropFruit([fruitIndex, x, y]) {
@@ -367,12 +382,12 @@ function toggleGameMode() {
     normalCanvas.style.display = 'none'
     gameCanvas = byId('gameCanvas')
     gameCanvas.style.display = 'block'
-    gameCanvas.style.margin = '20px auto'
-    gameCanvas.style.display = 'block'
+    gameCanvas.style.margin = '0 auto'
     gameInfo.style.display = 'block'
     gameCtx = gameCanvas.getContext('2d')
     
-    toggleBtn.textContent = '🎨 Back to Cursor Mode'
+    toggleBtn.textContent = '🎨 Switch to Cursor Mode'
+    toggleBtn.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
     
     // Initialize game state
     initializeGameState()
@@ -392,12 +407,13 @@ function toggleGameMode() {
         if (state.collectibles) gameState.collectibles = state.collectibles
       })
     }
-  } else {
+    } else {
     // Switch back to normal mode
-    gameCanvas.style.display = 'none'
+    if (gameCanvas) gameCanvas.style.display = 'none'
     normalCanvas.style.display = 'block'
     gameInfo.style.display = 'none'
-    toggleBtn.textContent = '🎮 Try WASM Game Mode with Collision Obstacles'
+    toggleBtn.textContent = '🎮 Switch to Game Mode'
+    toggleBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
     
     if (gameAnimationFrame) {
       cancelAnimationFrame(gameAnimationFrame)

@@ -15,24 +15,26 @@ html {
 }
 
 body {
-  background-color: #000;
+  background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
   color: #fff;
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   font-family: 'Space Mono', monospace;
   padding: 1rem;
-  padding-bottom: 6rem;
+  padding-bottom: 3rem;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
 #gameCanvas {
   display: block;
-  margin: 20px auto;
+  margin: 0 auto;
   cursor: crosshair;
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
+  transition: opacity 0.3s ease;
+  animation: fadeIn 0.5s ease, glow 3s ease infinite;
 }
 
 .ready:not(.keyboard-mode),
@@ -45,42 +47,46 @@ body {
 }
 
 #canvas {
-  position: fixed;
-  top: 0;
-  bottom: 0;
+  position: relative;
+  overflow: hidden;
   left: 0;
   right: 0;
   pointer-events: none;
   z-index: 2;
   user-select: none;
+  animation: fadeIn 0.5s ease;
 }
 
 header {
-  margin-top: 2.4rem;
-  margin-bottom: 6rem;
-  border-top: 10px solid #fff;
-  border-bottom: 10px solid #fff;
-  padding: 3rem 0;
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+  padding: 2rem 0;
+  text-align: center;
+  background: rgba(0,0,0,0.3);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
 }
 
 header > div {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-top: 4rem;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
+  gap: 20px;
 }
 
 header a {
-  background-color: blue;
-  color: #fff;
+  background-color: rgba(102,126,234,0.2);
+  color: #667eea;
   text-decoration: none;
-  padding: 1rem;
-  font-size: 2rem;
-  font-weight: bold;
+  padding: 0.5rem 1rem;
+  font-size: 1.4rem;
+  font-weight: normal;
   display: inline-block;
-  font-style: italic;
-  border-radius: 3px;
+  border-radius: 6px;
   user-select: none;
+  transition: all 0.3s;
+  border: 1px solid rgba(102,126,234,0.3);
 }
 
 #room-num {
@@ -93,12 +99,16 @@ header a:hover {
 }
 
 h1 {
-  font-size: 7rem;
-  text-transform: lowercase;
-  display: inline-block;
-  position: absolute;
-  transform: rotate(-90deg) translateX(-100%) translateY(-70%);
-  transform-origin: 0;
+  font-size: 3.5rem;
+  text-transform: none;
+  display: block;
+  position: relative;
+  transform: none;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 h1 sup {
@@ -168,15 +178,20 @@ pre {
 }
 
 .cursor {
-  margin-left: -10px;
-  margin-top: -2px;
+  margin-left: -24px;
+  margin-top: -24px;
+  transition: left 0.1s ease, top 0.1s ease;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
 }
 
 .cursor.self p {
-  color: #000;
-  background-color: #fff;
-  font-size: 2rem;
-  padding: 0 0.5rem;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-size: 1.4rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
 .cursor img {
@@ -185,16 +200,23 @@ pre {
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
+  filter: brightness(1.1);
 }
 
 .cursor p {
   text-align: center;
   font-size: 1.2rem;
+  margin-top: 2px;
+  background: rgba(0,0,0,0.7);
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-block;
 }
 
 .fruit {
-  font-size: 5rem;
-  animation: drop 3s ease-in forwards;
+  font-size: 4rem;
+  animation: drop 2.5s ease-in forwards;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
 @keyframes drop {
@@ -214,6 +236,26 @@ pre {
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(102,126,234,0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(102,126,234,0.5);
   }
 }
 
