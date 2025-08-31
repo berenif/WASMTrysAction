@@ -3,7 +3,6 @@
  * Integrates WASM game logic with P2P room functionality
  */
 
-import {makeAction} from '../room.js'
 import {
   initGameEngine,
   createGameInstance,
@@ -18,7 +17,7 @@ import {
 } from './game-engine.js'
 
 // Game room configuration defaults
-const defaultGameConfig = {
+export const defaultGameConfig = {
   tickRate: 60, // Game updates per second
   syncInterval: 100, // State sync interval in ms
   maxPlayers: 8,
@@ -54,12 +53,12 @@ export const createGameRoom = async (room, wasmSource, gameConfig = {}) => {
   const playerStates = new Map()
   const actionQueue = []
   
-  // Create game-specific actions
-  const [sendGameAction, receiveGameAction] = makeAction('gameAction')
-  const [sendStateSync, receiveStateSync] = makeAction('stateSync')
-  const [sendPlayerJoin, receivePlayerJoin] = makeAction('playerJoin')
-  const [sendPlayerLeave, receivePlayerLeave] = makeAction('playerLeave')
-  const [sendHostTransfer, receiveHostTransfer] = makeAction('hostTransfer')
+  // Create game-specific actions using the room's makeAction method
+  const [sendGameAction, receiveGameAction] = room.makeAction('gameAction')
+  const [sendStateSync, receiveStateSync] = room.makeAction('stateSync')
+  const [sendPlayerJoin, receivePlayerJoin] = room.makeAction('playerJoin')
+  const [sendPlayerLeave, receivePlayerLeave] = room.makeAction('playerLeave')
+  const [sendHostTransfer, receiveHostTransfer] = room.makeAction('hostTransfer')
   
   // Enhanced room object
   const gameRoom = {

@@ -23,20 +23,5 @@ export {
   defaultGameConfig
 } from './wasm/game-room.js'
 
-// Re-export types for TypeScript users
-export type {
-  GameConfig,
-  GameState,
-  PlayerState,
-  GameAction,
-  GameUpdateResult,
-  GameEvent,
-  WasmSource,
-  WasmImports,
-  WasmExports
-} from './wasm/game-engine.js'
-
-export type {
-  GameRoom,
-  GameRoomConfig
-} from './wasm/game-room.js'
+// Type exports are handled in the .d.ts file
+// JavaScript modules don't need to export types
