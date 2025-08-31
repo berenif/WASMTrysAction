@@ -28,7 +28,15 @@
 │   ├── firebase.js/d.ts   # Firebase strategy
 │   ├── supabase.js/d.ts   # Supabase strategy
 │   ├── mqtt.js/d.ts       # MQTT strategy
-│   └── ipfs.js/d.ts       # IPFS strategy
+│   ├── ipfs.js/d.ts       # IPFS strategy
+│   │
+│   ├── game.js/d.ts       # Game module main export
+│   └── wasm/              # WASM game engine
+│       ├── game-engine.js/d.ts    # WASM loader and interface
+│       ├── game-room.js/d.ts      # Game room integration
+│       └── examples/              # Example WASM games
+│           ├── simple-game.ts     # AssemblyScript game example
+│           └── usage-example.js   # Integration examples
 │
 ├── test/                   # Test files
 │   ├── tests.js           # Main test suite
@@ -39,12 +47,17 @@
 │   ├── get-bundle-sizes.js    # Bundle size analysis
 │   ├── test-ice.js            # ICE server testing
 │   ├── test-relays.js         # Relay server testing
-│   └── find-proxy.js          # Proxy discovery for testing
+│   ├── find-proxy.js          # Proxy discovery for testing
+│   └── build-wasm.js          # WASM compilation script
 │
 ├── docs/                   # Documentation website
 │   ├── index.html         # Demo page
 │   ├── site.js/css        # Demo application
 │   └── images/            # Documentation assets
+│
+├── dist/                   # Build output (generated)
+│   ├── trystero-*.min.js  # Strategy bundles
+│   └── wasm/              # Compiled WASM modules
 │
 ├── package.json           # Project dependencies and scripts
 ├── rollup.config.js       # Build configuration
@@ -124,6 +137,12 @@ npm run test-relays
 4. **Peer Connections**: WebRTC connection management
    - Handled by `peer.js`
    - Manages SDP exchange, ICE candidates, and data channels
+
+5. **WASM Game Engine**: High-performance game logic execution
+   - WebAssembly modules for deterministic game logic
+   - Integrated with P2P networking layer
+   - Support for real-time and turn-based games
+   - Client-side prediction and interpolation
 
 ### Key Design Decisions
 - **Modular Strategy System**: Easy to add new connection strategies
@@ -226,6 +245,119 @@ npm run test-relays
 - Use lazy loading for strategy-specific code
 - Minimize external dependencies
 - Profile WebRTC performance in browsers
+
+## 🎮 WASM Game Architecture
+
+### Overview
+The WASM game module extends Trystero with high-performance game logic capabilities, allowing developers to build multiplayer games with deterministic physics, complex game state management, and efficient networking.
+
+### Architecture Components
+
+#### 1. Game Engine Layer (`src/wasm/game-engine.js`)
+- **WASM Module Loader**: Handles loading and initialization of WebAssembly modules
+- **Memory Management**: Efficient memory allocation and string/object serialization
+- **Game Instance Management**: Creates and manages multiple game instances
+- **State Processing**: Processes game actions and maintains authoritative state
+- **Event System**: Bridges WASM events with JavaScript callbacks
+
+#### 2. Room Integration Layer (`src/wasm/game-room.js`)
+- **Enhanced Room**: Extends base Trystero rooms with game capabilities
+- **Network Synchronization**: Handles state sync between peers
+- **Host Management**: Automatic host selection and transfer
+- **Action Queue**: Manages game actions with latency compensation
+- **Update Loop**: Configurable tick rate for game updates
+
+#### 3. WASM Game Logic
+- **AssemblyScript/Rust/C++**: Write game logic in compiled languages
+- **Deterministic Execution**: Ensures consistent game state across peers
+- **Efficient Processing**: Native performance for physics and calculations
+- **Memory Safety**: Sandboxed execution environment
+
+### Key Features
+
+#### Client-Side Prediction
+- Immediate response to player inputs
+- Rollback and reconciliation with authoritative state
+- Configurable prediction settings
+
+#### State Interpolation
+- Smooth visual updates between network syncs
+- Latency compensation
+- Configurable interpolation settings
+
+#### Host Authority Model
+- One peer acts as authoritative host
+- Automatic host migration on disconnect
+- Optional host-less mode for deterministic games
+
+#### Game State Management
+- Efficient binary serialization
+- Delta compression for network updates
+- State persistence and replay support
+
+### Usage Patterns
+
+#### Real-Time Games
+```javascript
+import {joinRoom} from 'trystero/nostr'
+import {createGameRoom} from 'trystero/game'
+
+const room = joinRoom({appId: 'my-game'}, 'room-id')
+const gameRoom = await createGameRoom(room, wasmModule, {
+  tickRate: 60,
+  syncInterval: 100,
+  interpolation: true,
+  prediction: true
+})
+```
+
+#### Turn-Based Games
+```javascript
+const gameRoom = await createGameRoom(room, wasmModule, {
+  tickRate: 1,
+  syncInterval: 1000,
+  interpolation: false,
+  prediction: false,
+  requireHost: false
+})
+```
+
+### Building WASM Games
+
+#### 1. Write Game Logic (AssemblyScript Example)
+```typescript
+export function update_game(gameId: i32, deltaTime: f32): i32 {
+  // Update physics, check collisions, process game rules
+  return serializeState()
+}
+```
+
+#### 2. Compile to WASM
+```bash
+npm run build-wasm
+# Or manually: npx asc game.ts -o game.wasm --optimize
+```
+
+#### 3. Integrate with Trystero
+```javascript
+const gameRoom = await createGameRoomFromUrl(
+  room,
+  '/dist/wasm/game.wasm',
+  config
+)
+```
+
+### Performance Considerations
+- WASM execution is near-native speed
+- Minimize memory copies between WASM and JavaScript
+- Use binary data for network transmission when possible
+- Profile both WASM and JavaScript performance
+
+### Security
+- WASM runs in sandboxed environment
+- No direct DOM or network access from WASM
+- All I/O through controlled host functions
+- Validate all inputs from peers
 
 ## 📚 External Resources
 
