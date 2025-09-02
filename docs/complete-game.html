@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Game - Roguelike Adventure</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        #gameContainer {
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        
+        #gameCanvas {
+            border: 2px solid #444;
+            border-radius: 10px;
+            display: block;
+            cursor: crosshair;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            color: white;
+            font-size: 18px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            user-select: none;
+        }
+        
+        .ui-bar {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .ui-label {
+            margin-right: 10px;
+            min-width: 80px;
+        }
+        
+        .bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #555;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+            border-radius: 9px;
+        }
+        
+        .health-bar {
+            background: linear-gradient(90deg, #ff3333, #ff6666);
+        }
+        
+        .mana-bar {
+            background: linear-gradient(90deg, #3366ff, #6699ff);
+        }
+        
+        .exp-bar {
+            background: linear-gradient(90deg, #33ff33, #66ff66);
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #settings {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+        }
+        
+        .settings-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .settings-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .settings-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="ui">
+            <div class="ui-bar">
+                <span class="ui-label">Health:</span>
+                <div class="bar">
+                    <div class="bar-fill health-bar" id="healthBar" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="ui-bar">
+                <span class="ui-label">Mana:</span>
+                <div class="bar">
+                    <div class="bar-fill mana-bar" id="manaBar" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="ui-bar">
+                <span class="ui-label">EXP:</span>
+                <div class="bar">
+                    <div class="bar-fill exp-bar" id="expBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <div>Level: <span id="level">1</span></div>
+                <div>Score: <span id="score">0</span></div>
+            </div>
+        </div>
+        
+        <div id="settings">
+            <button class="settings-btn active" id="soundToggle">🔊 Sound</button>
+            <button class="settings-btn active" id="musicToggle">🎵 Music</button>
+            <button class="settings-btn" id="fullscreenToggle">⛶ Fullscreen</button>
+        </div>
+        
+        <div id="controls">
+            <div>WASD/Arrow Keys: Move | Space: Attack | E: Interact | P: Pause</div>
+        </div>
+        
+        <div id="loading">
+            <div>Loading Game...</div>
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import the game modules from local src directory
+        import { SoundSystem } from './src/sound-system.js';
+        import { ParticleSystem } from './src/particle-system.js';
+        import { createCamera } from './src/camera-effects.js';
+        
+        // Game class
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                // Initialize systems
+                this.soundSystem = new SoundSystem();
+                this.particleSystem = new ParticleSystem();
+                this.cameraSystem = createCamera(this.canvas.width, this.canvas.height);
+                
+                // Game state
+                this.player = {
+                    x: 400,
+                    y: 300,
+                    vx: 0,
+                    vy: 0,
+                    health: 100,
+                    maxHealth: 100,
+                    mana: 100,
+                    maxMana: 100,
+                    exp: 0,
+                    expToNext: 100,
+                    level: 1,
+                    score: 0,
+                    speed: 5,
+                    size: 20
+                };
+                
+                this.enemies = [];
+                this.projectiles = [];
+                this.items = [];
+                
+                // Input state
+                this.keys = {};
+                this.mouseX = 0;
+                this.mouseY = 0;
+                
+                // Game flags
+                this.paused = false;
+                this.gameOver = false;
+                
+                // Initialize
+                this.init();
+            }
+            
+            async init() {
+                // Load sounds
+                await this.soundSystem.loadDefaultSounds();
+                
+                // Set up input handlers
+                this.setupInputHandlers();
+                
+                // Set up UI handlers
+                this.setupUIHandlers();
+                
+                // Create some initial enemies
+                this.spawnEnemies(5);
+                
+                // Create particle emitters
+                this.particleSystem.createEmitter('playerTrail', this.player.x, this.player.y, {
+                    emissionRate: 5,
+                    particleOptions: {
+                        color: '#00ff00',
+                        size: 3,
+                        life: 0.5,
+                        decay: 0.05,
+                        gravity: -0.05
+                    }
+                });
+                
+                // Hide loading screen
+                document.getElementById('loading').style.display = 'none';
+                
+                // Start game loop
+                this.lastTime = performance.now();
+                this.gameLoop();
+            }
+            
+            setupInputHandlers() {
+                // Keyboard input
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.key.toLowerCase()] = true;
+                    
+                    if (e.key.toLowerCase() === 'p') {
+                        this.paused = !this.paused;
+                    }
+                    
+                    if (e.key === ' ') {
+                        this.attack();
+                        e.preventDefault();
+                    }
+                });
+                
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                });
+                
+                // Mouse input
+                this.canvas.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = e.clientX - rect.left;
+                    this.mouseY = e.clientY - rect.top;
+                });
+                
+                this.canvas.addEventListener('click', () => {
+                    this.attack();
+                });
+            }
+            
+            setupUIHandlers() {
+                document.getElementById('soundToggle').addEventListener('click', (e) => {
+                    const enabled = this.soundSystem.toggleSound();
+                    e.target.classList.toggle('active', enabled);
+                    e.target.textContent = enabled ? '🔊 Sound' : '🔇 Sound';
+                });
+                
+                document.getElementById('musicToggle').addEventListener('click', (e) => {
+                    const enabled = this.soundSystem.toggleMusic();
+                    e.target.classList.toggle('active', enabled);
+                    e.target.textContent = enabled ? '🎵 Music' : '🔇 Music';
+                });
+                
+                document.getElementById('fullscreenToggle').addEventListener('click', () => {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen();
+                    } else {
+                        document.exitFullscreen();
+                    }
+                });
+            }
+            
+            spawnEnemies(count) {
+                for (let i = 0; i < count; i++) {
+                    this.enemies.push({
+                        x: Math.random() * this.canvas.width,
+                        y: Math.random() * this.canvas.height,
+                        vx: 0,
+                        vy: 0,
+                        health: 30,
+                        maxHealth: 30,
+                        speed: 2,
+                        size: 15,
+                        color: '#ff4444'
+                    });
+                }
+            }
+            
+            attack() {
+                if (this.paused || this.gameOver) return;
+                
+                // Calculate direction to mouse
+                const dx = this.mouseX - this.player.x;
+                const dy = this.mouseY - this.player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 0) {
+                    // Create projectile
+                    this.projectiles.push({
+                        x: this.player.x,
+                        y: this.player.y,
+                        vx: (dx / dist) * 10,
+                        vy: (dy / dist) * 10,
+                        damage: 10,
+                        size: 5,
+                        color: '#ffff00'
+                    });
+                    
+                    // Play sound
+                    this.soundSystem.playSound('shoot');
+                    
+                    // Create particle effect
+                    this.particleSystem.createSpark(this.player.x, this.player.y, Math.atan2(dy, dx));
+                    
+                    // Camera shake
+                    this.cameraSystem.camera.shake(5, 100);
+                }
+            }
+            
+            update(deltaTime) {
+                if (this.paused || this.gameOver) return;
+                
+                // Update player movement
+                this.player.vx = 0;
+                this.player.vy = 0;
+                
+                if (this.keys['w'] || this.keys['arrowup']) this.player.vy = -this.player.speed;
+                if (this.keys['s'] || this.keys['arrowdown']) this.player.vy = this.player.speed;
+                if (this.keys['a'] || this.keys['arrowleft']) this.player.vx = -this.player.speed;
+                if (this.keys['d'] || this.keys['arrowright']) this.player.vx = this.player.speed;
+                
+                this.player.x += this.player.vx;
+                this.player.y += this.player.vy;
+                
+                // Keep player in bounds
+                this.player.x = Math.max(this.player.size, Math.min(this.canvas.width - this.player.size, this.player.x));
+                this.player.y = Math.max(this.player.size, Math.min(this.canvas.height - this.player.size, this.player.y));
+                
+                // Update particle emitter position
+                const trailEmitter = this.particleSystem.getEmitter('playerTrail');
+                if (trailEmitter) {
+                    trailEmitter.setPosition(this.player.x, this.player.y);
+                }
+                
+                // Update enemies
+                this.enemies.forEach(enemy => {
+                    // Simple AI - move towards player
+                    const dx = this.player.x - enemy.x;
+                    const dy = this.player.y - enemy.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist > 0) {
+                        enemy.vx = (dx / dist) * enemy.speed;
+                        enemy.vy = (dy / dist) * enemy.speed;
+                    }
+                    
+                    enemy.x += enemy.vx;
+                    enemy.y += enemy.vy;
+                    
+                    // Check collision with player
+                    if (dist < this.player.size + enemy.size) {
+                        this.player.health -= 0.5;
+                        this.cameraSystem.camera.shake(10, 200);
+                        this.cameraSystem.effects.flash('#ff0000', 100);
+                    }
+                });
+                
+                // Update projectiles
+                this.projectiles = this.projectiles.filter(projectile => {
+                    projectile.x += projectile.vx;
+                    projectile.y += projectile.vy;
+                    
+                    // Check collision with enemies
+                    let hit = false;
+                    this.enemies = this.enemies.filter(enemy => {
+                        const dx = projectile.x - enemy.x;
+                        const dy = projectile.y - enemy.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < projectile.size + enemy.size) {
+                            enemy.health -= projectile.damage;
+                            hit = true;
+                            
+                            if (enemy.health <= 0) {
+                                // Enemy destroyed
+                                this.particleSystem.createExplosion(enemy.x, enemy.y);
+                                this.soundSystem.playSound('explosion');
+                                this.player.score += 10;
+                                this.player.exp += 20;
+                                
+                                // Check level up
+                                if (this.player.exp >= this.player.expToNext) {
+                                    this.levelUp();
+                                }
+                                
+                                return false;
+                            }
+                            
+                            // Hit effect
+                            this.particleSystem.createSpark(enemy.x, enemy.y);
+                            this.soundSystem.playSound('hit');
+                        }
+                        
+                        return true;
+                    });
+                    
+                    // Remove projectile if hit or out of bounds
+                    return !hit && 
+                           projectile.x > 0 && projectile.x < this.canvas.width &&
+                           projectile.y > 0 && projectile.y < this.canvas.height;
+                });
+                
+                // Spawn new enemies periodically
+                if (this.enemies.length < 3) {
+                    this.spawnEnemies(2);
+                }
+                
+                // Update particle system
+                this.particleSystem.update(deltaTime / 16);
+                
+                // Update camera
+                this.cameraSystem.camera.follow(this.player);
+                this.cameraSystem.update(deltaTime);
+                
+                // Update UI
+                this.updateUI();
+                
+                // Check game over
+                if (this.player.health <= 0) {
+                    this.gameOver = true;
+                    this.cameraSystem.effects.fadeOut('#000000', 2000);
+                }
+            }
+            
+            levelUp() {
+                this.player.level++;
+                this.player.exp = 0;
+                this.player.expToNext = this.player.level * 100;
+                this.player.maxHealth += 10;
+                this.player.health = this.player.maxHealth;
+                this.player.maxMana += 10;
+                this.player.mana = this.player.maxMana;
+                
+                // Effects
+                this.cameraSystem.effects.flash('#ffff00', 300);
+                this.cameraSystem.effects.zoomPunch(0.3, 500);
+                this.particleSystem.createExplosion(this.player.x, this.player.y, {
+                    count: 50,
+                    color: '#ffff00',
+                    speed: 8
+                });
+                this.soundSystem.playSound('pickup');
+            }
+            
+            updateUI() {
+                document.getElementById('healthBar').style.width = `${(this.player.health / this.player.maxHealth) * 100}%`;
+                document.getElementById('manaBar').style.width = `${(this.player.mana / this.player.maxMana) * 100}%`;
+                document.getElementById('expBar').style.width = `${(this.player.exp / this.player.expToNext) * 100}%`;
+                document.getElementById('level').textContent = this.player.level;
+                document.getElementById('score').textContent = this.player.score;
+            }
+            
+            render() {
+                // Clear canvas
+                this.ctx.fillStyle = '#111';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Apply camera transformations
+                this.cameraSystem.apply(this.ctx);
+                
+                // Draw grid background
+                this.ctx.strokeStyle = '#222';
+                this.ctx.lineWidth = 1;
+                for (let x = 0; x < this.canvas.width; x += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.canvas.height);
+                    this.ctx.stroke();
+                }
+                for (let y = 0; y < this.canvas.height; y += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.canvas.width, y);
+                    this.ctx.stroke();
+                }
+                
+                // Draw enemies
+                this.enemies.forEach(enemy => {
+                    this.ctx.fillStyle = enemy.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    // Health bar
+                    if (enemy.health < enemy.maxHealth) {
+                        this.ctx.fillStyle = '#000';
+                        this.ctx.fillRect(enemy.x - 15, enemy.y - enemy.size - 10, 30, 4);
+                        this.ctx.fillStyle = '#ff0000';
+                        this.ctx.fillRect(enemy.x - 15, enemy.y - enemy.size - 10, 30 * (enemy.health / enemy.maxHealth), 4);
+                    }
+                });
+                
+                // Draw projectiles
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowColor = '#ffff00';
+                this.projectiles.forEach(projectile => {
+                    this.ctx.fillStyle = projectile.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(projectile.x, projectile.y, projectile.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                });
+                this.ctx.shadowBlur = 0;
+                
+                // Draw player
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.beginPath();
+                this.ctx.arc(this.player.x, this.player.y, this.player.size, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Draw particles
+                this.particleSystem.render(this.ctx);
+                
+                // Restore camera
+                this.cameraSystem.restore(this.ctx);
+                
+                // Apply post-processing effects
+                this.cameraSystem.render(this.ctx);
+                
+                // Draw pause overlay
+                if (this.paused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.ctx.fillStyle = 'white';
+                    this.ctx.font = '48px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.canvas.width / 2, this.canvas.height / 2);
+                }
+                
+                // Draw game over overlay
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.ctx.fillStyle = 'white';
+                    this.ctx.font = '48px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 50);
+                    this.ctx.font = '24px Arial';
+                    this.ctx.fillText(`Final Score: ${this.player.score}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
+                    this.ctx.fillText('Press F5 to restart', this.canvas.width / 2, this.canvas.height / 2 + 60);
+                }
+            }
+            
+            gameLoop() {
+                const currentTime = performance.now();
+                const deltaTime = currentTime - this.lastTime;
+                this.lastTime = currentTime;
+                
+                this.update(deltaTime);
+                this.render();
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        }
+        
+        // Start the game when the page loads
+        window.addEventListener('load', () => {
+            const game = new Game();
+        });
+    </script>
+</body>
+</html>
